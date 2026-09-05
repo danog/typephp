@@ -840,6 +840,11 @@ trait MethodCallTrait
         } else {
             $funcName = '';
         }
+        // A variable method name explicitly requests runtime dispatch. Such a
+        // call site commonly receives unrelated route/callback names, so a
+        // monomorphic method cache adds guards and request state without a
+        // reliable hit rate. Cache only a source-level identifier.
+        $cacheMethod = $this->isNamedMethod($expr->name);
 
         $requiresDynamicScope = $this->runtimeMethodRequiresDynamicScope(
             $class,
@@ -862,6 +867,10 @@ trait MethodCallTrait
         if (empty($expr->args)) {
             if ($requiresDynamicScope && $this->methodDef) {
                 if (!$resolvedMethodPtr) {
+                    if (!$cacheMethod) {
+                        return 'php::callScoped(' . $object . ', ' . $methodPtr . ', '
+                            . $this->getCallableScopeExpr() . ')';
+                    }
                     return 'typephp_call_method_scoped_cached(' . $object . ', ' . $methodPtr . ', '
                         . $this->getCallableScopeExpr() . ', ' . $this->getMethodCallCache() . ')';
                 }
@@ -871,6 +880,9 @@ trait MethodCallTrait
                 return 'php::callScoped(' . $object . ', ' . $methodPtr . ', ' . $this->getCallableScopeExpr() . ')';
             }
             if (!$resolvedMethodPtr) {
+                if (!$cacheMethod) {
+                    return $object . '.call(' . $methodPtr . ')';
+                }
                 return 'typephp_call_method_cached(' . $object . ', ' . $methodPtr . ', '
                     . $this->getMethodCallCache() . ')';
             }
@@ -881,9 +893,16 @@ trait MethodCallTrait
             if (!$resolvedMethodPtr) {
                 $callArgs = $this->parseCallArgs($expr->args, $funcName, $class);
                 if ($requiresDynamicScope && $this->methodDef) {
+                    if (!$cacheMethod) {
+                        return 'php::callScoped(' . $object . ', ' . $methodPtr . ', '
+                            . $this->getCallableScopeExpr() . ', ' . $callArgs . ')';
+                    }
                     return 'typephp_call_method_scoped_cached(' . $object . ', ' . $methodPtr . ', '
                         . $this->getCallableScopeExpr() . ', ' . $this->getMethodCallCache() . ', '
                         . $callArgs . ')';
+                }
+                if (!$cacheMethod) {
+                    return $object . '.call(' . $methodPtr . ', ' . $callArgs . ')';
                 }
                 return 'typephp_call_method_cached(' . $object . ', ' . $methodPtr . ', '
                     . $this->getMethodCallCache() . ', ' . $callArgs . ')';

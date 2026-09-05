@@ -28,16 +28,17 @@ final class CallCacheCodegenTest extends BaseTest
         self::assertSame(1, substr_count($code, 'typephp_call_cached('));
         self::assertSame(3, substr_count($code, 'php::callStaticMethod('));
         self::assertStringNotContainsString('php::concat({', $code);
-        self::assertSame(7, substr_count($code, 'php::VarList{'));
+        self::assertSame(8, substr_count($code, 'php::VarList{'));
         self::assertStringNotContainsString('std::array<php::Variant', $code);
         self::assertStringNotContainsString('php::ArgList{', $code);
-        self::assertSame(3, substr_count($code, 'typephp_call_method_cached('));
-        self::assertSame(1, substr_count($code, 'typephp_call_method_scoped_cached('));
-        self::assertStringNotContainsString('php::callScoped(', $code);
+        self::assertSame(2, substr_count($code, 'typephp_call_method_cached('));
+        self::assertSame(0, substr_count($code, 'typephp_call_method_scoped_cached('));
+        self::assertSame(1, substr_count($code, 'php::callScoped('));
+        self::assertSame(2, substr_count($code, '.call(method'));
         self::assertStringContainsString('.call(get_persistent_method(', $code);
 
         self::assertStringContainsString('php::FunctionCallCacheSlot function_call_cache_map[1]', $extension);
-        self::assertStringContainsString('php::MethodCallCacheSlot method_call_cache_map[4]', $extension);
+        self::assertStringContainsString('php::MethodCallCacheSlot method_call_cache_map[2]', $extension);
         self::assertStringContainsString('typephp_get_function_call_cache(FunctionCallCacheId cache_id)', $extension);
         self::assertStringContainsString('typephp_get_method_call_cache(MethodCallCacheId cache_id)', $extension);
     }

@@ -15,11 +15,6 @@ class Symbol
         return 'php::getStaticProperty';
     }
 
-    public static function getResolvedStaticProperty(): string
-    {
-        return 'typephp_get_static_property';
-    }
-
     public static function getStaticPropertyRef(): string
     {
         return 'php::getStaticPropertyRef';
@@ -38,16 +33,6 @@ class Symbol
     public static function concat(): string
     {
         return 'php::concat';
-    }
-
-    public static function getCalledCe(): string
-    {
-        return 'typephp_get_called_ce(this_)';
-    }
-
-    public static function getCalledClass(): string
-    {
-        return 'typephp_get_called_class(this_)';
     }
 
     public static function constant(): string

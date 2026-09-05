@@ -12,6 +12,7 @@ function call_cache_sites(mixed $callback, object $object, ?object $nullable, mi
         $object->$method(2),
         $object->fixedMethod(3),
         $nullable?->nullableMethod(4),
+        $nullable?->$method(5),
     ];
 }
 
