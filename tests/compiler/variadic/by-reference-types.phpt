@@ -59,7 +59,7 @@ function main(): void
     bump_objects($first, $second);
     var_dump($first->value, $second->value);
 
-    $invalid = any('not-an-int');
+    $invalid = std::any('not-an-int');
     try {
         require_ints($invalid);
     } catch (TypeError $error) {

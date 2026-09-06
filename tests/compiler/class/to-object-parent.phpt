@@ -1,5 +1,5 @@
 --TEST--
-objval with parent::class
+toObject keyword method with parent::class
 --FILE--
 <?php
 
@@ -15,7 +15,7 @@ class Child extends Base {
     }
 
     public function castToParent($obj): Base {
-        return objval($obj, parent::class);
+        return $obj->toObject(parent::class);
     }
 
     public function toParent($obj): Base {

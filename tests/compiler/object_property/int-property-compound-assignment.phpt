@@ -70,7 +70,7 @@ function main(): void
     var_dump($box->value, $receiverCalls, $operandCalls);
 
     $box->value = 3;
-    $numericString = any('4');
+    $numericString = std::any('4');
     $box->value += $numericString;
     var_dump($box->value);
 

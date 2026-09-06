@@ -1,11 +1,11 @@
 --TEST--
-objval
+toObject keyword method with self::class
 --FILE--
 <?php
 
 class Foo {
     public function run($obj) {
-        $o = objval($obj, self::class);
+        $o = $obj->toObject(self::class);
         $o->bar();
     }
 

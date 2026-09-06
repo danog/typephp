@@ -52,21 +52,18 @@ $user->profile = null; // ✅ 对象属性可显式设置为 null
 
 ---
 
-## 🎯 objval 编译期函数
+## 🎯 `toObject()` 关键词方法
 
 ### 使用场景
 
-当从数组、函数返回值等来源获取对象时，变量会丢失类型上下文信息。此时需要使用 `objval()` 显式声明对象的类。
+当从数组、函数返回值等来源获取对象时，变量会丢失类型上下文信息。此时使用 `toObject()` 关键词方法断言对象类型。
 
 ### 基本语法
 
 ```php
 <?php
-// objval 接收两个参数：
-// 1. 对象变量（必须是 PHP variable 表达式）
-// 2. 类名（必须是字面量字符串）
-
-$obj = objval($array['object'], 'ClassName');
+// 接收者是待检查值，参数是编译期可确定的类名
+$obj = $array['object']->toObject(ClassName::class);
 ```
 
 ### 典型场景
@@ -83,9 +80,9 @@ $data = [
 // ❌ 错误：类型丢失
 $user = $data['user'];  // AOT 无法推断类型
 
-// ✅ 正确：使用 objval 声明类型
-$user = objval($data['user'], 'User');
-$product = objval($data['product'], 'Product');
+// ✅ 正确：使用 toObject() 声明类型
+$user = $data['user']->toObject(User::class);
+$product = $data['product']->toObject(Product::class);
 ```
 
 #### 场景二：函数返回对象
@@ -99,8 +96,8 @@ function get_object() {
 // ❌ 类型丢失
 $obj = get_object();
 
-// ✅ 使用 objval 声明
-$obj = objval(get_object(), 'stdClass');
+// ✅ 使用 toObject() 声明
+$obj = get_object()->toObject(stdClass::class);
 ```
 
 #### 场景三：工厂模式
@@ -123,8 +120,8 @@ class Factory {
 $factory = new Factory();
 
 // ✅ 明确指定返回的对象类型
-$user = objval($factory->create('user'), 'User');
-$product = objval($factory->create('product'), 'Product');
+$user = $factory->create('user')->toObject(User::class);
+$product = $factory->create('product')->toObject(Product::class);
 ```
 
 ### 注意事项
@@ -134,46 +131,45 @@ $product = objval($factory->create('product'), 'Product');
 ```php
 <?php
 // ✅ 正确：字面量类名
-$obj = objval($value, 'MyClass');
+$obj = $value->toObject(MyClass::class);
 
 // ❌ 错误：变量类名（编译期无法分析）
 $className = 'MyClass';
-$obj = objval($value, $className);  // 编译错误
+$obj = $value->toObject($className);  // 编译错误
 
 // ❌ 错误：常量类名（编译期可能无法解析）
 const CLASS_NAME = 'MyClass';
-$obj = objval($value, CLASS_NAME);  // 可能失败
+$obj = $value->toObject(CLASS_NAME);  // 可能失败
 ```
 
-⚠️ **第一个参数必须是 variable 表达式**:
+接收者可以是受支持的任意值表达式：
 
 ```php
 <?php
 // ✅ 正确：variable 表达式
-$obj = objval($array['key'], 'MyClass');
-$obj = objval($object->property, 'MyClass');
-$obj = objval(get_object(), 'MyClass');
+$obj = $array['key']->toObject(MyClass::class);
+$obj = $object->property->toObject(MyClass::class);
+$obj = get_object()->toObject(MyClass::class);
 
-// ❌ 错误：非 variable 表达式
-$obj = objval(new MyClass(), 'MyClass');  // 不需要
+// ✅ 合法，但表达式已经具备精确类型，因此没有必要
+$obj = (new MyClass())->toObject(MyClass::class);  // 不需要
 ```
 
 ### 性能影响
 
-- ✅ `objval()` 是**编译期函数**
-- ✅ 不会产生运行时开销
-- ✅ 仅在编译阶段进行类型推断
-- ✅ 生成的 C++ 代码与普通变量赋值相同
+- ✅ `toObject()` 是 TypePHP 关键词方法
+- ✅ 为编译器提供目标类信息
+- ✅ 当运行时类型不能被静态证明时，生成 PHPX 对象转换/类型检查
 
 ### 与 std:: 类型的区别
 
-| 特性 | std::int/float/bool | objval |
+| 特性 | std::int/float/bool | toObject |
 |------|---------------------|--------|
 | **用途** | 数值/布尔类型优化 | 对象类型声明 |
 | **性能** | ⚡ 高性能（原生类型） | 🐢 标准（ZVAL） |
 | **内存** | 8B/1B | 指针（16B+） |
-| **时机** | 运行时优化 | 编译期推断 |
-| **语法** | `std::int(值)` | `objval(变量，'类名')` |
+| **时机** | 运行时优化 | 编译期降级，必要时运行时检查 |
+| **语法** | `std::int(值)` | `$value->toObject(ClassName::class)` |
 
 ---
 

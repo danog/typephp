@@ -526,9 +526,7 @@ trait LoopVarOptimizer
                     return true;
                 }
             }
-            if ($node instanceof Expr\FuncCall
-                && $node->name instanceof Node\Name
-                && strtolower($node->name->toString()) === 'refval') {
+            if ($this->isStdRefCall($node)) {
                 foreach ($node->args as $arg) {
                     if ($arg instanceof Node\Arg && $this->loopExprUsesAny($arg->value, $vars)) {
                         return true;
@@ -739,9 +737,7 @@ trait LoopVarOptimizer
                     return true;
                 }
             }
-            if ($expr instanceof Expr\FuncCall
-                && $expr->name instanceof Node\Name
-                && strtolower($expr->name->toString()) === 'refval') {
+            if ($this->isStdRefCall($expr)) {
                 foreach ($expr->args as $arg) {
                     if ($arg instanceof Node\Arg && $this->exprUsesVar($arg->value, $varName)) {
                         return true;

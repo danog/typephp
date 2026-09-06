@@ -4,8 +4,8 @@ any
 <?php
 function main()
 {
-    $a = any(10);
-    $b = any(4);
+    $a = std::any(10);
+    $b = std::any(4);
     echo var_dump($a/$b);
 }
 ?>

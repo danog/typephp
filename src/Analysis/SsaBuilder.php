@@ -1373,9 +1373,9 @@ class SsaBuilder
      *
      * Two mechanisms in TypePHP:
      *   1. Explicit &$var at call site: func(&$x) — detected via $arg->byRef
-     *   2. refval() pseudo-function: func(refval($x)) — used for dynamic calls
+     *   2. std::ref() pseudo-function: func(std::ref($x)) — used for dynamic calls
      *      where the compiler can't statically determine if the parameter is byRef.
-     *      The compiler detects refval() via isRefvalCall() and unwraps it during codegen.
+     *      The compiler detects std::ref() via isStdRefCall() and unwraps it during codegen.
      *
      * When a variable is passed by reference to a function call, the function
      * may modify it. We model this as:
@@ -1453,7 +1453,7 @@ class SsaBuilder
      *
      * Handles both:
      *   - Explicit &$var (arg->byRef === true)
-     *   - refval($var) pseudo-function wrapping
+     *   - std::ref($var) pseudo-function wrapping
      *
      * @param Node\Arg[] $args
      */
@@ -1470,10 +1470,8 @@ class SsaBuilder
                 $varName = $arg->value->name;
             }
 
-            // Case 2: refval($var) — TypePHP convention for dynamic calls
-            if ($varName === null && $arg->value instanceof Expr\FuncCall
-                && $arg->value->name instanceof Node\Name
-                && $arg->value->name->toLowerString() === 'refval'
+            // Case 2: std::ref($var) — TypePHP convention for dynamic calls
+            if ($varName === null && $this->isStdRefCall($arg->value)
                 && !empty($arg->value->args)) {
                 $inner = $arg->value->args[0]->value;
                 if ($inner instanceof Expr\Variable && is_string($inner->name)) {

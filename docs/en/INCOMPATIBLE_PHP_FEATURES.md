@@ -93,15 +93,15 @@ incompatible with or more restrictive than standard PHP.
   limitation as "TypePHP does not support reference parameters".
 - Closures and arrow functions support fixed by-reference parameters. Because a
   Closure invocation is dynamically dispatched, the caller must still mark
-  reference arguments explicitly with `refval()` / `toRef()`; Zend callbacks
+  reference arguments explicitly with `std::ref()` / `toRef()`; Zend callbacks
   use the generated Closure arginfo automatically.
 - Reference assignment cannot create a reference from a complex static-property
   expression.
 - Calls whose argument signature cannot be determined at compile time — dynamic
   calls, closure calls, and the like — cannot convert reference parameters
-  automatically; `refval()` or the equivalent keyword method `toRef()` must be
+  automatically; `std::ref()` or the equivalent keyword method `toRef()` must be
   used explicitly.
-- `refval()` / `toRef()` only accept variables, array elements, or object
+- `std::ref()` / `toRef()` only accept variables, array elements, or object
   properties.
 - A call that uses argument unpacking followed by named arguments falls back to
   dynamic dispatch and cannot use the native call path.
@@ -172,7 +172,7 @@ incompatible with or more restrictive than standard PHP.
 - Dynamic property chains, dynamic class names, dynamic function names, and
   dynamic callbacks all go through the Zend runtime fallback and are not
   guaranteed to be natively optimized; reference parameters of dynamic calls
-  still require an explicit `refval()` or `toRef()`.
+  still require an explicit `std::ref()` or `toRef()`.
 - `Closure::bind()`, `Closure::bindTo()`, and `Closure::call()` are not
   supported. A closure cannot be rebound to an object or class scope in AOT
   code.

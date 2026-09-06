@@ -78,8 +78,8 @@ AST，待全部项目符号就绪后再在 convert 阶段解析。这一两阶�
   （`$s->upper()`、`$arr->contains()`、`$big->mul(2)`）；静态类型已知时在编译期
   直接解析调用。
 - **混合 C++ / PHP 编程** —— 在性能关键内核中直接调用 C++ 函数（反之亦然）。
-- **编译期函数与关键词** —— `any()`、`refval()`、`objval()`、`expected()`、
-  `unexpected()`，以及 `toInt()`、`toString()`、`toArray()` 等。
+- **编译期函数与关键词** —— `std::any()`、`std::ref()`、`std::expected()`、
+  `std::unexpected()`，以及 `toObject()`、`toInt()`、`toString()`、`toArray()` 等。
 - **编译期安全检查** —— `#[Immutable]` 只读契约和 `#[ArrayDef]` 数组结构元数据，
   在编译期检查，零运行时开销。
 - **编译期代码生成** —— `#[Getter]`、`#[Setter]`、`#[With]`、`#[Constructor]`、
@@ -673,6 +673,7 @@ GitHub Actions 会在 PHP 8.4 和 8.5 上分别运行 PHPUnit 与自举 PHPT。�
 ## 文档
 
 - [快速入门](docs/zh-cn/QUICKSTART.md) —— 最小编译流程
+- [变更记录](CHANGELOG.md) —— 破坏性变更与 1.0 前升级说明
 - [编译模式](docs/zh-cn/COMPILATION_MODES.md) —— `bin`、`ext`、`lib`
 - [编译器命令行](docs/zh-cn/COMPILER_CLI.md) —— CLI 参数与项目配置
 - [不兼容 PHP 特性清单](docs/zh-cn/INCOMPATIBLE_PHP_FEATURES.md) —— 当前限制
@@ -680,7 +681,7 @@ GitHub Actions 会在 PHP 8.4 和 8.5 上分别运行 PHPUnit 与自举 PHPT。�
 - [高精度类型](docs/zh-cn/HIGH_PRECISION_TYPES.md) —— BigInt / Decimal / BigFloat
 - [Std 容器](docs/zh-cn/STD_CONTAINERS.md) —— 强类型容器
 - [通用方法](docs/zh-cn/UNIVERSAL_METHODS.md) —— 编译期方法解析
-- [编译期函数](docs/zh-cn/COMPILE_TIME_FUNCTIONS.md) —— `any()`、`refval()`、`objval()` 等
+- [编译期函数](docs/zh-cn/COMPILE_TIME_FUNCTIONS.md) —— `std::any()`、`std::ref()`、`std::expected()` 等
 - [混合 C++/PHP](docs/zh-cn/MIXED_CPP_PHP.md) —— C++/PHP 互操作
 - [`#[Immutable]`](docs/zh-cn/IMMUTABLE.md) —— 编译期只读契约
 - [`#[ArrayDef]`](docs/zh-cn/ARRAY_DEF.md) —— 强类型数组属性契约

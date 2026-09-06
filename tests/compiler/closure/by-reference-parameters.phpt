@@ -1,5 +1,5 @@
 --TEST--
-Dynamic Closures accept positional arguments explicitly marked with refval
+Dynamic Closures accept positional arguments explicitly marked with std::ref
 --FILE--
 <?php
 
@@ -9,7 +9,7 @@ function main(): void
         $value .= '!';
     };
     $text = 'fixed';
-    $fixed(refval($text));
+    $fixed(std::ref($text));
     var_dump($text);
 
     $optional = static function (&$value = null): void {
@@ -20,17 +20,17 @@ function main(): void
 
     $arrow = static fn (&$value): int => ++$value;
     $number = 40;
-    var_dump($arrow(refval($number)), $number);
+    var_dump($arrow(std::ref($number)), $number);
 
     $typed = static function (int &$value): void {
         $value++;
     };
-    $typed(refval($number));
+    $typed(std::ref($number));
     var_dump($number);
 
-    $invalid = any('not-an-int');
+    $invalid = std::any('not-an-int');
     try {
-        $typed(refval($invalid));
+        $typed(std::ref($invalid));
     } catch (TypeError $error) {
         echo "typed reference rejected\n";
     }

@@ -39,7 +39,7 @@ function main(): void
 
     $increment = 'cached_increment';
     $value = 10;
-    var_dump($increment(refval($value)));
+    var_dump($increment(std::ref($value)));
     var_dump($value);
 
     $throw = 'cached_throw';

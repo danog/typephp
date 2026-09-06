@@ -470,9 +470,7 @@ trait SsaPropOptimizer
             return;
         }
 
-        if ($node instanceof Expr\FuncCall
-            && $node->name instanceof Node\Name
-            && $node->name->toLowerString() === 'refval'
+        if ($this->isStdRefCall($node)
             && isset($node->args[0])
             && $node->args[0] instanceof Node\Arg) {
             $propName = $this->getPropNameOfObj($node->args[0]->value, $objName);

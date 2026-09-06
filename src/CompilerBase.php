@@ -2140,9 +2140,6 @@ class CompilerBase implements PropertyAccessContext
         }
         if ($this->isFuncCallExpr($expr) and $this->isNameExpr($expr->name)) {
             $fn = $this->parseIdentifier($expr->name);
-            if (count($expr->args) === 2 and $fn === 'objval') {
-                return $this->resolveClassNameArg($expr->args[1]->value);
-            }
             if ($this->hasFunction($fn)) {
                 return $this->getFunction($fn)->returnClass;
             }
@@ -3156,9 +3153,6 @@ class CompilerBase implements PropertyAccessContext
                     if (in_array($name, self::STREAM_FUNCTIONS)) {
                         return Type::STREAM;
                     }
-                    if ($globalName === 'expected' || $globalName === 'unexpected') {
-                        return Type::BOOL;
-                    }
                     if (count($expr->args) === 1 and $this->isPlaceholderExpr($expr->args[0])) {
                         return Type::OBJECT;
                     }
@@ -3212,7 +3206,7 @@ class CompilerBase implements PropertyAccessContext
                         return Type::OBJECT;
                     }
                     $className = $this->parseIdentifier($expr->class);
-                    if (strtolower($className) === 'std') {
+                    if (strtolower(ltrim($className, '\\')) === 'std') {
                         $method = strtolower($this->parseIdentifier($expr->name));
                         return match ($method) {
                             'int' => Type::INT,
@@ -3221,6 +3215,7 @@ class CompilerBase implements PropertyAccessContext
                             'bigint' => Type::BIGINT,
                             'decimal' => Type::DECIMAL,
                             'bigfloat' => Type::BIGFLOAT,
+                            'expected', 'unexpected' => Type::BOOL,
                             default => Type::VAR,
                         };
                     }
@@ -4724,16 +4719,6 @@ class CompilerBase implements PropertyAccessContext
             return $this->getTypeFromZendType($returnType);
         }
         return Type::VAR;
-    }
-
-    protected function genObjvalCall(Expr\FuncCall $expr): string
-    {
-        if (count($expr->args) !== 2) {
-            $this->fatalError($expr, 'objval() requires exactly 2 arguments');
-        }
-        $receiver = $this->parseExpr($expr->args[0]->value);
-        $className = $this->resolveClassNameArg($expr->args[1]->value);
-        return 'php::toObject(' . $receiver . ', ' . $this->getClassEntryPtr($className) . ')';
     }
 
     protected function identifierToStr(NodeAbstract $node, bool $require = true, bool $literal = false): string

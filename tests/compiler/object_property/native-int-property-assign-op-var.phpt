@@ -15,15 +15,15 @@ class NativeIntAssignOpBox
 function main(): void
 {
     $box = new NativeIntAssignOpBox();
-    $delta = any(2);
+    $delta = std::any(2);
     $box->value += $delta;
     var_dump($box->value);
 
-    $text = any("3");
+    $text = std::any("3");
     $box->value += $text;
     var_dump($box->value);
 
-    $bad = any("abc");
+    $bad = std::any("abc");
     try {
         $box->value += $bad;
     } catch (TypeError $e) {
@@ -31,7 +31,7 @@ function main(): void
     }
 
     $selfBox = new NativeIntAssignOpBox();
-    $selfDelta = any(5);
+    $selfDelta = std::any(5);
     $selfBox->add($selfDelta);
     var_dump($selfBox->value);
 }

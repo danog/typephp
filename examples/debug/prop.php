@@ -8,7 +8,7 @@ class Data {
 function main()
 {
     $o = new Data;
-    $value = any('222');
+    $value = std::any('222');
     $o->value = $value;
     $o->value += '333';
     var_dump($o->value);

@@ -3975,7 +3975,7 @@ class EnumCaseInfo {
                     "{$id}_{$key}",
                     $allConstInfos,
                     $phpVersionIdMinimumCompatibility,
-                    refval($declaredStrings),
+                    \std::ref($declaredStrings),
                 );
             }
         }
@@ -4306,7 +4306,7 @@ class ClassInfo {
             $code .= $enumCase->getDeclaration(
                 $allConstInfos,
                 $this->phpVersionIdMinimumCompatibility,
-                refval($declaredStrings),
+                \std::ref($declaredStrings),
             );
         }
 
@@ -4344,7 +4344,7 @@ class ClassInfo {
                     "class_{$escapedName}_$key",
                     $allConstInfos,
                     $this->phpVersionIdMinimumCompatibility,
-                    refval($declaredStrings)
+                    \std::ref($declaredStrings)
                 );
             }
 
@@ -6204,7 +6204,7 @@ function generateFunctionAttributeInitialization(iterable $funcInfos, array $all
                     "func_" . $funcInfo->name->getNameForAttributes() . "_$key",
                     $allConstInfos,
                     $phpVersionIdMinimumCompatibility,
-                    refval($useDeclared)
+                    \std::ref($useDeclared)
                 );
             }
 
@@ -6216,7 +6216,7 @@ function generateFunctionAttributeInitialization(iterable $funcInfos, array $all
                         "func_{$funcInfo->name->getNameForAttributes()}_arg{$index}_$key",
                         $allConstInfos,
                         $phpVersionIdMinimumCompatibility,
-                        refval($useDeclared)
+                        \std::ref($useDeclared)
                     );
                 }
             }
@@ -6272,7 +6272,7 @@ function generateGlobalConstantAttributeInitialization(
                     $constVarName . "_$key",
                     $allConstInfos,
                     PHP_85_VERSION_ID,
-                    refval($useDeclared)
+                    \std::ref($useDeclared)
                 );
             }
 
@@ -6320,7 +6320,7 @@ function generateConstantAttributeInitialization(
                     "const_" . $constInfo->name->getDeclarationName() . "_$key",
                     $allConstInfos,
                     $phpVersionIdMinimumCompatibility,
-                    refval($useDeclared)
+                    \std::ref($useDeclared)
                 );
             }
 
@@ -6350,7 +6350,7 @@ function generatePropertyAttributeInitialization(
                 "property_" . $propertyInfo->name->getDeclarationName() . "_" . $key,
                 $allConstInfos,
                 $phpVersionIdMinimumCompatibility,
-                refval($declaredStrings)
+                \std::ref($declaredStrings)
             );
         }
     }

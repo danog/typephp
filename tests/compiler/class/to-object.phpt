@@ -1,5 +1,5 @@
 --TEST--
-objval
+toObject keyword method
 --FILE--
 <?php
 
@@ -23,7 +23,7 @@ class TestEvent
 
 function wrapObjval($ev): TestEvent
 {
-    return objval($ev, TestEvent::class);
+    return $ev->toObject(TestEvent::class);
 }
 
 function main() {

@@ -1,5 +1,5 @@
 --TEST--
-refval with object property
+std::ref with an object property
 --FILE--
 <?php
 function main()
@@ -8,7 +8,7 @@ function main()
 
     $obj = new stdClass();
     $obj->prop = 'original';
-    prop_ref_test(refval($obj->prop));
+    prop_ref_test(std::ref($obj->prop));
     echo $obj->prop;
 }
 ?>

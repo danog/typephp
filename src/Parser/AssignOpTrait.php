@@ -590,8 +590,9 @@ trait AssignOpTrait
                     $type = $type === Type::VOID ? Type::VAR : $type;
                 } elseif ($this->isStaticCall($right) and $this->isNameExpr($right->class) and $this->isIdExpr($right->name)) {
                     $class = $this->parseIdentifier($right->class);
-                    if ($class === 'std') {
-                        if (in_array($right->name->toString(), ['array', 'vector', 'map', 'ordered_map'], true)) {
+                    if ($this->isStdClassExpr($right->class)) {
+                        $stdMethod = strtolower($right->name->toString());
+                        if (in_array($stdMethod, ['array', 'vector', 'map', 'ordered_map'], true)) {
                             if ($this->hasScopeGlobalVar($var) || $this->hasStaticVar($var)) {
                                 $this->assertNativeStdContainerFunctionLocal($right);
                             }
@@ -601,15 +602,15 @@ trait AssignOpTrait
                             if ($this->context->scopeLevel > 1) {
                                 $this->fatalError($left, "Must create std::{$right->name->toString()} in the top-level scope of the function");
                             }
-                            if ($right->name->toString() === 'array') {
+                            if ($stdMethod === 'array') {
                                 $this->addLocalVar($var, Type::STD_ARRAY);
                                 return $this->parseStdArray($var, $right);
                             }
-                            if ($right->name->toString() === 'vector') {
+                            if ($stdMethod === 'vector') {
                                 $this->addLocalVar($var, Type::STD_VECTOR);
                                 return $this->parseStdVector($var, $right);
                             }
-                            if ($right->name->toString() === 'map') {
+                            if ($stdMethod === 'map') {
                                 $this->addLocalVar($var, Type::STD_MAP);
                                 return $this->parseStdMap($var, $right);
                             }
@@ -617,11 +618,13 @@ trait AssignOpTrait
                             return $this->parseStdOrderedMap($var, $right);
                         } else {
                             $valueExpr = $this->parseStdCall($right);
+                            $finalVarType = $right->getAttribute('nativeType') ?? Type::VAR;
                             if (!$this->hasVar($var)) {
-                                $finalVarType = $right->getAttribute('nativeType');
                                 $this->addLocalVar($var, $finalVarType);
                             }
-                            $this->context->explicitNativeTypeVars[$var] = true;
+                            if ($finalVarType !== Type::VAR) {
+                                $this->context->explicitNativeTypeVars[$var] = true;
+                            }
                             return $var . ' = ' . $valueExpr;
                         }
                     }

@@ -1,5 +1,5 @@
 --TEST--
-SSA object prop: nested refval property use prevents hoisting
+SSA object prop: nested std::ref property use prevents hoisting
 --FILE--
 <?php
 use native_types;
@@ -17,7 +17,7 @@ function main(): void {
     $o = new Foo();
     $o->a = 10;
 
-    $ignored = mutate(refval($o->a));
+    $ignored = mutate(std::ref($o->a));
     $o->a += 5;
 
     var_dump($o->a);

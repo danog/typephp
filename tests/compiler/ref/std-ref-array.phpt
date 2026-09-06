@@ -1,5 +1,5 @@
 --TEST--
-refval with array element
+std::ref with an array element
 --FILE--
 <?php
 function main()
@@ -7,7 +7,7 @@ function main()
     eval('function array_ref_test(&$val) { $val = "modified"; }');
 
     $arr = ['key' => 'original'];
-    array_ref_test(refval($arr['key']));
+    array_ref_test(std::ref($arr['key']));
     echo $arr['key'];
 }
 ?>

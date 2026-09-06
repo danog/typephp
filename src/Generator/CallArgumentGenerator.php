@@ -467,7 +467,7 @@ trait CallArgumentGenerator
                 if ($byRef) {
                     $this->assertReadonlyPropertyReferenceForbidden($arg->value, $arg, false);
                 }
-                $value = ($byRef || $this->isRefvalCall($arg->value) || $this->isToRefCall($arg->value))
+                $value = ($byRef || $this->isStdRefCall($arg->value) || $this->isToRefCall($arg->value))
                     ? $this->parseReferenceCallArgValue($arg)
                     : $this->parseCallArgValue($arg);
                 $value = $this->wrapScopedCallbackArg($arg, $value);
@@ -557,12 +557,12 @@ trait CallArgumentGenerator
                     $this->addPositionalCallArg($this->parseArgRefVar($arg, $name), $arrayArgsVar, $list_args, $forceArrayArgs);
                     continue;
                 }
-                $expr = $this->expandRefvalExpr($inner, $arg);
+                $expr = $this->expandReferenceWrapperExpr($inner, $arg);
                 if ($expr !== null) {
                     $this->addPositionalCallArg($expr, $arrayArgsVar, $list_args, $forceArrayArgs);
                     continue;
                 }
-                $this->fatalError($arg, 'The refval function only accepts a variable, array element, or object property');
+                $this->fatalError($arg, 'The std::ref function only accepts a variable, array element, or object property');
             } else {
                 if ($byRef) {
                     if ($this->isScalar($arg->value)) {
@@ -784,14 +784,14 @@ trait CallArgumentGenerator
 
     protected function isReferenceWrapperCall(NodeAbstract $expr): bool
     {
-        return $this->isRefvalCall($expr) || $this->isToRefCall($expr);
+        return $this->isStdRefCall($expr) || $this->isToRefCall($expr);
     }
 
     protected function unwrapReferenceWrapperCall(NodeAbstract $expr, NodeAbstract $errorNode): NodeAbstract
     {
-        if ($this->isRefvalCall($expr)) {
+        if ($this->isStdRefCall($expr)) {
             if (count($expr->args) !== 1) {
-                $this->fatalError($errorNode, 'The refval function only accepts one parameter');
+                $this->fatalError($errorNode, 'The std::ref function only accepts one parameter');
             }
             return $expr->args[0]->value;
         }
@@ -807,11 +807,11 @@ trait CallArgumentGenerator
     }
 
     /**
-     * Expand an array element or object property inside a refval() call into its
+     * Expand an array element or object property inside a std::ref() call into its
      * corresponding C++ reference expression. Returns null for a plain variable,
      * which the caller then handles itself.
      */
-    protected function expandRefvalExpr(NodeAbstract $inner, Node\Arg $arg): ?string
+    protected function expandReferenceWrapperExpr(NodeAbstract $inner, Node\Arg $arg): ?string
     {
         if ($this->isPropertyFetch($inner)) {
             return $this->emitDynamicPropertyFetchRef($inner, $arg);

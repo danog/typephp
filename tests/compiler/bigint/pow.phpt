@@ -11,7 +11,7 @@ function main()
     $b = $a->pow(3);
     Assert::eq($b, 27);
 
-    $d = any(5);
+    $d = std::any(5);
     $c = $a->pow($d);
     Assert::eq($c, 243);
 }

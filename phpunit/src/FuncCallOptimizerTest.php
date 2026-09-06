@@ -31,7 +31,7 @@ final class FuncCallOptimizerTest extends BaseTest
         self::assertMatchesRegularExpression('/php_optimizertypedint\(\);\s*php::call/', $code);
         self::assertMatchesRegularExpression('/php_optimizerdynamicbool\(\);\s*php::call/', $code);
         self::assertStringContainsString('php::fn::hypot(php::toFloat(', $code);
-        self::assertStringContainsString('php::ArgList{php::null}', $code);
+        self::assertStringContainsString('php::VarList{php::null}', $code);
         self::assertMatchesRegularExpression('/php::fn::json_decode\([^;]+php::null\);/', $code);
         self::assertStringContainsString('php::fn::floor(1.5)', $code);
         self::assertStringContainsString('php::fn::round(1.25)', $code);

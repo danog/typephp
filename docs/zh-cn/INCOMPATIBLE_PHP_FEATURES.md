@@ -44,10 +44,10 @@
 - `exit(message: $value)` 可作为 TypePHP named-argument 扩展使用；它与位置参数 `exit($value)` 进入同一退出路径。
 - TypePHP 使用严格参数数量规则：非 variadic 函数不接受声明范围之外的额外参数；`func_get_args()` 不会隐式放宽签名。
 - 已知签名的普通函数、普通方法和 native 直调支持引用参数及写回；不要把编译器内部跨 Trait 动态分派的限制误写成“TypePHP 不支持引用参数”。
-- 闭包和箭头函数支持固定引用参数。Closure 调用属于动态分派，调用方仍须通过 `refval()` / `toRef()` 显式标记引用参数；由 Zend 发起 callback 时则会自动使用编译器生成的 Closure arginfo。
+- 闭包和箭头函数支持固定引用参数。Closure 调用属于动态分派，调用方仍须通过 `std::ref()` / `toRef()` 显式标记引用参数；由 Zend 发起 callback 时则会自动使用编译器生成的 Closure arginfo。
 - 引用赋值不支持从复杂静态属性表达式建立引用。
-- 动态调用、闭包调用等编译期无法确定参数签名的调用，不能自动转换引用参数；需要显式使用 `refval()` 或等价关键词方法 `toRef()`。
-- `refval()` / `toRef()` 只接受变量、数组元素或对象属性。
+- 动态调用、闭包调用等编译期无法确定参数签名的调用，不能自动转换引用参数；需要显式使用 `std::ref()` 或等价关键词方法 `toRef()`。
+- `std::ref()` / `toRef()` 只接受变量、数组元素或对象属性。
 - 带 unpack 且尾部追加 named arguments 的调用会退化为动态调用，不能使用 native call。
 
 ## 对象模型
@@ -80,7 +80,7 @@
 - `static::class` 在需要编译期常量类名的位置不支持。
 - `__CLASS__` 只允许在 `class` 定义的代码段中使用（`PHP`允许，返回空字符串）。
 - `__TRAIT__` 只允许在 `trait` 定义的代码段中使用（`PHP`允许，返回空字符串）。
-- 动态属性链、动态类名、动态函数名和动态回调会统一走 Zend runtime fallback，不保证 native 优化；动态调用的引用参数仍需显式使用 `refval()` 或 `toRef()`。
+- 动态属性链、动态类名、动态函数名和动态回调会统一走 Zend runtime fallback，不保证 native 优化；动态调用的引用参数仍需显式使用 `std::ref()` 或 `toRef()`。
 - 不支持 `Closure::bind()`、`Closure::bindTo()` 和 `Closure::call()`；闭包不能在 AOT 代码中重新绑定对象或 class scope。
 - 所有源文件必须是 `UTF-8` 编码。
 

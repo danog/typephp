@@ -90,8 +90,8 @@ This two-phase design keeps multi-file and self-hosted builds deterministic.
   are resolved directly at compile time.
 - **Mixed C++ / PHP** — call C++ functions from PHP (and vice versa) for
   performance-critical kernels.
-- **Compile-time functions & keywords** — `any()`, `refval()`, `objval()`,
-  `expected()`, `unexpected()`, plus `toInt()`, `toString()`, `toArray()` and
+- **Compile-time functions & keywords** — `std::any()`, `std::ref()`,
+  `std::expected()`, `std::unexpected()`, plus `toObject()`, `toInt()`, `toString()`, `toArray()` and
   friends.
 - **Compile-time safety** — `#[Immutable]` read-only contracts and `#[ArrayDef]`
   array-shape metadata, checked at compile time with zero runtime cost.
@@ -724,6 +724,7 @@ rules and a PHPT whenever runtime output or diagnostics are observable.
 ## Documentation
 
 - [Quick Start](docs/en/QUICKSTART.md) — minimal compilation flow
+- [Change log](CHANGELOG.md) — breaking changes and pre-1.0 upgrade notes
 - [Compilation modes](docs/en/COMPILATION_MODES.md) — `bin`, `ext`, `lib`
 - [Compiler CLI](docs/en/COMPILER_CLI.md) — CLI arguments and project config
 - [Incompatible PHP features](docs/en/INCOMPATIBLE_PHP_FEATURES.md) — current limits
@@ -731,7 +732,7 @@ rules and a PHPT whenever runtime output or diagnostics are observable.
 - [High-precision types](docs/en/HIGH_PRECISION_TYPES.md) — BigInt / Decimal / BigFloat
 - [Std containers](docs/en/STD_CONTAINERS.md) — strongly-typed containers
 - [Universal methods](docs/en/UNIVERSAL_METHODS.md) — compile-time method resolution
-- [Compile-time functions](docs/en/COMPILE_TIME_FUNCTIONS.md) — `any()`, `refval()`, `objval()`, …
+- [Compile-time functions](docs/en/COMPILE_TIME_FUNCTIONS.md) — `std::any()`, `std::ref()`, `std::expected()`, …
 - [Mixed C++/PHP](docs/en/MIXED_CPP_PHP.md) — C++/PHP interop
 - [`#[Immutable]`](docs/en/IMMUTABLE.md) — compile-time read-only contracts
 - [`#[ArrayDef]`](docs/en/ARRAY_DEF.md) — typed array-property contracts

@@ -381,6 +381,22 @@ trait MethodCallTrait
     protected function parseStdCall(Expr\StaticCall $expr): string
     {
         $func = strtolower($this->parseIdentifier($expr->name));
+        if ($func === 'any') {
+            return $this->parseAnyCompileTimeCall($expr);
+        }
+        if ($func === 'expected' || $func === 'unexpected') {
+            if (count($expr->args) !== 1
+                || !$expr->args[0] instanceof Node\Arg
+                || $expr->args[0]->unpack
+            ) {
+                $this->fatalError($expr, "The std::{$func} function expects exactly one non-unpacked argument");
+            }
+            $condition = $this->parseExprAsValue($expr->args[0]->value);
+            return 'static_cast<bool>(' . strtoupper($func) . '((' . $condition . ')))';
+        }
+        if ($func === 'ref') {
+            $this->fatalError($expr, 'The std::ref function may only be used as a call argument reference wrapper');
+        }
         $type = match ($func) {
             'int' => Type::INT,
             'float' => Type::FLOAT,
@@ -1152,7 +1168,7 @@ trait MethodCallTrait
             if ($class === 'self') {
                 $class = $this->getFullClassName();
                 $self = true;
-            } elseif ($class === 'std') {
+            } elseif ($this->isStdClassExpr($expr->class)) {
                 return $this->parseStdCall($expr);
             } else {
                 $class = $this->getNamespacedClassName($class);

@@ -52,21 +52,18 @@ Correct practices:
 
 ---
 
-## 🎯 The objval Compile-Time Function
+## 🎯 The `toObject()` Keyword Method
 
 ### Use Cases
 
-When obtaining objects from sources such as arrays or function return values, variables lose their type context information. In such cases you need to use `objval()` to explicitly declare the class of the object.
+When obtaining objects from sources such as arrays or function return values, variables lose their type context information. Use the `toObject()` keyword method to assert the object's class.
 
 ### Basic Syntax
 
 ```php
 <?php
-// objval takes two arguments:
-// 1. The object variable (must be a PHP variable expression)
-// 2. The class name (must be a literal string)
-
-$obj = objval($array['object'], 'ClassName');
+// The receiver is the value to check. The argument is a compile-time class name.
+$obj = $array['object']->toObject(ClassName::class);
 ```
 
 ### Typical Scenarios
@@ -83,9 +80,9 @@ $data = [
 // ❌ Wrong: type is lost
 $user = $data['user'];  // AOT cannot infer the type
 
-// ✅ Correct: use objval to declare the type
-$user = objval($data['user'], 'User');
-$product = objval($data['product'], 'Product');
+// ✅ Correct: use toObject() to declare the type
+$user = $data['user']->toObject(User::class);
+$product = $data['product']->toObject(Product::class);
 ```
 
 #### Scenario 2: A Function Returns an Object
@@ -99,8 +96,8 @@ function get_object() {
 // ❌ Type is lost
 $obj = get_object();
 
-// ✅ Use objval to declare
-$obj = objval(get_object(), 'stdClass');
+// ✅ Use toObject() to declare
+$obj = get_object()->toObject(stdClass::class);
 ```
 
 #### Scenario 3: The Factory Pattern
@@ -123,8 +120,8 @@ class Factory {
 $factory = new Factory();
 
 // ✅ Explicitly specify the returned object type
-$user = objval($factory->create('user'), 'User');
-$product = objval($factory->create('product'), 'Product');
+$user = $factory->create('user')->toObject(User::class);
+$product = $factory->create('product')->toObject(Product::class);
 ```
 
 ### Notes
@@ -134,46 +131,45 @@ $product = objval($factory->create('product'), 'Product');
 ```php
 <?php
 // ✅ Correct: literal class name
-$obj = objval($value, 'MyClass');
+$obj = $value->toObject(MyClass::class);
 
 // ❌ Wrong: variable class name (cannot be analyzed at compile time)
 $className = 'MyClass';
-$obj = objval($value, $className);  // Compile error
+$obj = $value->toObject($className);  // Compile error
 
 // ❌ Wrong: constant class name (may not be resolvable at compile time)
 const CLASS_NAME = 'MyClass';
-$obj = objval($value, CLASS_NAME);  // May fail
+$obj = $value->toObject(CLASS_NAME);  // May fail
 ```
 
-⚠️ **The first argument must be a variable expression**:
+The receiver may be any supported value expression:
 
 ```php
 <?php
 // ✅ Correct: variable expression
-$obj = objval($array['key'], 'MyClass');
-$obj = objval($object->property, 'MyClass');
-$obj = objval(get_object(), 'MyClass');
+$obj = $array['key']->toObject(MyClass::class);
+$obj = $object->property->toObject(MyClass::class);
+$obj = get_object()->toObject(MyClass::class);
 
-// ❌ Wrong: non-variable expression
-$obj = objval(new MyClass(), 'MyClass');  // Not needed
+// ✅ Legal, but redundant because the expression already has the exact type
+$obj = (new MyClass())->toObject(MyClass::class);  // Not needed
 ```
 
 ### Performance Impact
 
-- ✅ `objval()` is a **compile-time function**
-- ✅ It produces no runtime overhead
-- ✅ It only performs type inference during the compilation stage
-- ✅ The generated C++ code is identical to a normal variable assignment
+- ✅ `toObject()` is a TypePHP keyword method
+- ✅ It provides the compiler with the target class
+- ✅ It emits a PHPX object conversion/type check for values whose runtime class is not statically proven
 
 ### Differences from std:: Types
 
-| Feature | std::int/float/bool | objval |
+| Feature | std::int/float/bool | toObject |
 |------|---------------------|--------|
 | **Purpose** | Numeric/boolean type optimization | Object type declaration |
 | **Performance** | ⚡ High performance (native type) | 🐢 Standard (ZVAL) |
 | **Memory** | 8B/1B | Pointer (16B+) |
-| **Timing** | Runtime optimization | Compile-time inference |
-| **Syntax** | `std::int(value)` | `objval(variable, 'ClassName')` |
+| **Timing** | Runtime optimization | Compile-time lowering plus runtime check when needed |
+| **Syntax** | `std::int(value)` | `$value->toObject(ClassName::class)` |
 
 ---
 

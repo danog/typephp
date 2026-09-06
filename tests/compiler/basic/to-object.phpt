@@ -1,5 +1,5 @@
 --TEST--
-objval
+toObject keyword method
 --FILE--
 <?php
 

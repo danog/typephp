@@ -239,11 +239,11 @@ trait NativeTypeCompatibilityTrait
                 if ($this->isVarExpr($inner)) {
                     $arg->value = $inner;
                 } else {
-                    $expr = $this->expandRefvalExpr($inner, $arg);
+                    $expr = $this->expandReferenceWrapperExpr($inner, $arg);
                     if ($expr !== null) {
                         return $expr;
                     }
-                    $this->fatalError($arg, 'The refval function only accepts a variable, array element, or object property');
+                    $this->fatalError($arg, 'The std::ref function only accepts a variable, array element, or object property');
                 }
             } else {
                 $this->assertNativeObjectReferenceForbidden($arg->value, $arg);
