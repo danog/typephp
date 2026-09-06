@@ -287,20 +287,24 @@ trait AssignOpTrait
                 continue;
             }
             if ($item instanceof ArrayItem) {
-                $key = $item->key ? $this->parseArrayKey($item->key, true) : (string) $k;
+                $key = $item->key ?? new Node\Scalar\Int_($k, $item->getAttributes());
+                $itemExpr = new Expr\ArrayDimFetch(
+                    new Variable($tmpVar, $item->getAttributes()),
+                    $key,
+                    $item->getAttributes(),
+                );
                 if ($item->value instanceof Expr\List_) {
-                    $nestedTmp = $this->genTmpVarName();
-                    $this->addLocalVar($nestedTmp, Type::ARRAY);
-                    $code .= $this->getIndent() . "{$nestedTmp} = {$tmpVar}.item({$key});" . PHP_EOL;
                     $code .= $this->getIndent()
-                        . $this->parseAssignToList($item->value, new Variable($nestedTmp))
+                        . $this->parseAssignToList($item->value, $itemExpr)
                         . PHP_EOL;
                 } else {
-                    $var = $this->parseWritableIdentifier($item->value);
-                    if ($this->isVarExpr($item->value) and !$this->hasVar($var)) {
-                        $this->addLocalVar($var, Type::VAR);
-                    }
-                    $code .= $this->getIndent() . "{$var} = {$tmpVar}.item({$key});" . PHP_EOL;
+                    // Route every destructuring target through the normal
+                    // assignment pipeline. Existing native locals remain
+                    // native and receive the usual scalar conversion, while
+                    // typed properties retain their runtime type checks.
+                    $code .= $this->getIndent()
+                        . $this->parseAssignFinally($item->value, $itemExpr)
+                        . ';' . PHP_EOL;
                 }
             } else {
                 $this->unsupportedSyntax($item);
@@ -715,7 +719,6 @@ trait AssignOpTrait
             // assignment may not execute on every path.
             $this->markNativeObjectNonNull($var);
         }
-        $leftExprType = $this->detectTypeOfExpr($left);
         $rightExprType = $this->detectTypeOfExpr($right);
         if ($propertyWriteTarget !== null && ($propertyDef = $this->getNativePropertyDef($left)) !== null) {
             $effectiveRightType = $rightExprType === Type::VAR && $this->getFixedPropertyTypeCheckHelper($propertyDef) !== null
@@ -725,7 +728,7 @@ trait AssignOpTrait
         }
         $assignedExpr = $finalVarType === Type::VAR
             ? $rightExpr
-            : $this->convertExprType($rightExpr, $leftExprType, $rightExprType);
+            : $this->convertExprType($rightExpr, $finalVarType, $rightExprType);
         if ($foldIntoDeclaration) {
             $this->context->localVarInitializers[$var] = $assignedExpr;
             return '';

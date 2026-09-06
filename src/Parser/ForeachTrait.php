@@ -101,13 +101,7 @@ trait ForeachTrait
             if (!$this->hasVar($valueVar)) {
                 $this->addLocalVar($valueVar, Type::REF);
             } elseif ($this->getVarType($valueVar) !== Type::REF && $this->getVarType($valueVar) !== Type::VAR) {
-                if ($this->hasLocalVar($valueVar) && !$this->hasArgument($valueVar)) {
-                    // Local declarations are emitted after the body is parsed, so a
-                    // previously optimized scalar can still be promoted to Variant.
-                    $this->context->localVars[$valueVar] = Type::VAR;
-                } else {
-                    $this->fatalError($node, 'Cannot bind foreach reference to native variable of type ' . $this->getVarType($valueVar));
-                }
+                $this->fatalError($node, 'Cannot bind foreach reference to native variable of type ' . $this->getVarType($valueVar));
             }
             return $this->getIndent() . $valueRefExpr . '(' . $valueVar . ');' . PHP_EOL;
         }

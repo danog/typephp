@@ -46,6 +46,66 @@ final class VarIntTypesTest extends BaseTest
         self::assertStringNotContainsString('php::Var integer = 42L;', $defaultCode);
     }
 
+    public function testNativeIntegerCannotBeReusedAsForeachKey(): void
+    {
+        $this->expectException(TestError::class);
+        $this->expectExceptionMessage(
+            'Cannot assign value to variable $index of type php::Int with type php::Var',
+        );
+
+        $this->compileSource(
+            $this->createCompiler(),
+            TYPEPHP_ROOT_PATH . '/phpunit/code/foreach-key-native-reuse.php',
+        );
+    }
+
+    public function testVarIntAndExplicitAnyCanBeReusedAsForeachKeys(): void
+    {
+        foreach (['foreach-key-varint-reuse.php', 'foreach-key-any-reuse.php'] as $file) {
+            $code = $this->compileSource(
+                $this->createCompiler(),
+                TYPEPHP_ROOT_PATH . '/phpunit/code/' . $file,
+            );
+            self::assertStringContainsString('php::Var index', $code);
+            self::assertStringNotContainsString('php::Int index', $code);
+        }
+    }
+
+    public function testNativeScalarCannotBePromotedForReferenceCapture(): void
+    {
+        $this->expectException(TestError::class);
+        $this->expectExceptionMessage(
+            'Cannot create a reference to native variable of type php::Bool; initialize it with std::any()',
+        );
+
+        $this->compileSource(
+            $this->createCompiler(),
+            TYPEPHP_ROOT_PATH . '/phpunit/code/native-scalar-reference-capture.php',
+        );
+    }
+
+    public function testExplicitAnySupportsReferenceCapture(): void
+    {
+        $code = $this->compileSource(
+            $this->createCompiler(),
+            TYPEPHP_ROOT_PATH . '/phpunit/code/any-reference-capture.php',
+        );
+        self::assertStringContainsString('php::Var changed', $code);
+        self::assertStringContainsString('changed.toReference()', $code);
+    }
+
+    public function testDestructuringKeepsNativeTargetsAndConvertsDynamicItems(): void
+    {
+        $code = $this->compileSource(
+            $this->createCompiler(),
+            TYPEPHP_ROOT_PATH . '/phpunit/code/native-destructuring-reuse.php',
+        );
+
+        self::assertStringContainsString('php::Int index', $code);
+        self::assertMatchesRegularExpression('/index = php::toInt\([^;]+\.item\(0L?/', $code);
+        self::assertStringContainsString('php::toInt(', $code);
+    }
+
     private function createCompiler(): CompilerTest
     {
         global $translator;

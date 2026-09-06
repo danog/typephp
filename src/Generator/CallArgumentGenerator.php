@@ -150,28 +150,28 @@ trait CallArgumentGenerator
         // Evaluate every supplied argument in PHP source order. The resulting
         // expressions/temporaries may then be rearranged safely for the native
         // C++ ABI without changing observable call order.
-        foreach ($sourceArgs as $sourceIndex => [$argIndex, $variadicName, $arg]) {
+        foreach ($sourceArgs as $sourceIndex => [$sourceArgIndex, $variadicName, $arg]) {
             if ($sourceIndex < $lastHoistingSourceIndex
                 && $arg instanceof Node\Arg
                 && !$arg->unpack
                 && $this->isSnapshotableVariableRead($arg->value)
             ) {
-                $paramInfo = $argIndex === $variadicArgIndex
+                $paramInfo = $sourceArgIndex === $variadicArgIndex
                     ? $functionDef->argInfoList[$variadicArgIndex]
-                    : $this->getArgInfo($arg, $nativeFunc, $argIndex);
+                    : $this->getArgInfo($arg, $nativeFunc, $sourceArgIndex);
                 if ($paramInfo !== null && !$paramInfo->byRef) {
                     $snapshot = $this->parseOrderedOperand($arg->value, false, true);
                     $arg = clone $arg;
                     $arg->value = new Expr\Variable($snapshot, $arg->value->getAttributes());
                 }
             }
-            if ($argIndex !== $variadicArgIndex) {
-                $argInfo = $this->getArgInfo($arg, $nativeFunc, $argIndex);
-                $resolvedArgs[$argIndex] = $this->getTypeConvertedArg(
+            if ($sourceArgIndex !== $variadicArgIndex) {
+                $argInfo = $this->getArgInfo($arg, $nativeFunc, $sourceArgIndex);
+                $resolvedArgs[$sourceArgIndex] = $this->getTypeConvertedArg(
                     $arg,
                     $argInfo,
                     $callableName,
-                    $argIndex
+                    $sourceArgIndex
                 );
                 continue;
             }

@@ -291,7 +291,11 @@ trait TypeConversionTrait
         }
         $var = $this->parseIdentifier($expr);
         if ($this->isVarExpr($expr) and $this->isNativeTypeVar($var)) {
-            $this->context->localVars[$var] = Type::VAR;
+            $this->fatalError(
+                $expr,
+                'Cannot create a reference to native variable of type ' . $this->getVarType($var)
+                    . '; initialize it with std::any() when reference semantics are required',
+            );
         }
         return $var . '.toReference()';
     }

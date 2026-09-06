@@ -123,6 +123,9 @@ trait SsaTypeOptimizer
                 if (!$target instanceof Node) {
                     continue;
                 }
+                if ($target instanceof Node\Expr\Variable && is_string($target->name)) {
+                    $foreachTargets[$target->name] = true;
+                }
                 foreach ($nodeFinder->findInstanceOf($target, Node\Expr\Variable::class) as $variable) {
                     if (is_string($variable->name)) {
                         $foreachTargets[$variable->name] = true;

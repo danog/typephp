@@ -14,6 +14,10 @@ declare(strict_types=1);
 
 namespace TypePhp\StubGenerator;
 
+// php-src's stub generator intentionally follows Zend PHP's dynamic integer
+// semantics and frequently reuses loop/index variables for array keys.
+use varint_types;
+
 use Closure;
 use DOMCdataSection;
 use DOMComment;
@@ -2632,13 +2636,18 @@ class EvaluatedValue
         $nodeTraverser->addVisitor($visitor);
         $expr = $nodeTraverser->traverse([$expr])[0];
 
-        $isUnknownConstValue = false;
+        // Keep mutable callback state in an object: TypePHP deliberately uses
+        // native storage for inferred bool locals, which cannot be captured by
+        // PHP reference. Object capture preserves identity in both Zend PHP and
+        // the self-hosted compiler without changing the evaluator's behavior.
+        $evaluationState = new \stdClass();
+        $evaluationState->isUnknownConstValue = false;
 
         $evaluator = null;
         $evaluator = new ConstExprEvaluator(
             static function (Expr $expr) use (
                 $allConstInfos,
-                &$isUnknownConstValue,
+                $evaluationState,
                 &$evaluator,
             ) {
                 // php-parser's ConstExprEvaluator predates PHP 8.5 constant
@@ -2687,7 +2696,7 @@ class EvaluatedValue
                 } else {
                     $constName = $expr->name->__toString();
                     if (strtolower($constName) === "unknown") {
-                        $isUnknownConstValue = true;
+                        $evaluationState->isUnknownConstValue = true;
                         return null;
                     }
                 }
@@ -2745,6 +2754,7 @@ class EvaluatedValue
         // emitted through its @cvalue macro. For a concrete null expression,
         // however, the zval must be initialized as null even when the declared
         // type is nullable (for example, `const ?int VALUE = null`).
+        $isUnknownConstValue = $evaluationState->isUnknownConstValue;
         $valueType = $result === null && !$isUnknownConstValue
             ? SimpleType::null()
             : ($constType ?? SimpleType::fromValue($result));

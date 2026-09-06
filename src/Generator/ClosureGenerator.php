@@ -291,6 +291,11 @@ trait ClosureGenerator
         $this->context->inClosure = false;
         $code .= '};' . PHP_EOL;
 
+        // Capture expressions belong to the enclosing function. Restore its
+        // type table before validating references; the closure body registers
+        // every captured value as php::Var and must not hide a native outer
+        // variable that cannot legally acquire reference semantics.
+        $this->context = $oriContext;
         $useVars = [];
         if ($uses) {
             foreach ($uses as $useItem) {
@@ -313,7 +318,6 @@ trait ClosureGenerator
             }
         }
 
-        $this->context = $oriContext;
         $this->context->beforeStmtLines[] = $code;
 
         // Even a static closure inherits the outer called scope for late

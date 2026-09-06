@@ -113,7 +113,7 @@ trait SwitchTrait
             $hasDefault = false;
         }
 
-        foreach ($caseGroups as $target => [$conds]) {
+        foreach ($caseGroups as $groupIndex => [$conds]) {
             if (!empty($conds)) {
                 $groupMatched = $this->genTmpVarName();
                 $code .= $this->getIndent() . 'bool ' . $groupMatched . ' = false;' . PHP_EOL;
@@ -140,7 +140,7 @@ trait SwitchTrait
                 }
                 $code .= $this->getIndent() . 'if (' . $groupMatched . ') {' . PHP_EOL;
                 $code .= $this->getIndent() . $switchMatched . ' = true;' . PHP_EOL;
-                $code .= $this->getIndent() . $switchTarget . ' = ' . $target . ';' . PHP_EOL;
+                $code .= $this->getIndent() . $switchTarget . ' = ' . $groupIndex . ';' . PHP_EOL;
                 $code .= $this->getIndent() . '}' . PHP_EOL;
             }
         }
@@ -150,8 +150,8 @@ trait SwitchTrait
             $code .= $this->getIndent() . '}' . PHP_EOL;
         }
 
-        foreach ($caseGroups as $target => [, , $stmts]) {
-            $code .= $this->getIndent() . 'if (' . $switchTarget . ' == ' . $target . ') {' . PHP_EOL;
+        foreach ($caseGroups as $groupIndex => [, , $stmts]) {
+            $code .= $this->getIndent() . 'if (' . $switchTarget . ' == ' . $groupIndex . ') {' . PHP_EOL;
             $this->indentLevel++;
             $code .= $this->parseStmts($stmts);
             $this->indentLevel--;
