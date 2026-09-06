@@ -87,7 +87,6 @@ trait FuncCallOptimizer
             'base64_encode', 'base64_decode',
             'urlencode', 'urldecode', 'rawurlencode', 'rawurldecode',
             'json_encode', 'json_decode', 'serialize', 'unserialize',
-            'random_int', 'random_bytes', 'mt_rand', 'rand',
             'strstr', 'strrpos', 'is_a', 'is_subclass_of',
             'uniqid',
             'dirname', 'basename',
@@ -143,6 +142,56 @@ trait FuncCallOptimizer
                 'minArgs' => 1,
                 'maxArgs' => 2,
                 'returnType' => Type::STR,
+                'intrinsic' => true,
+            ],
+
+            // Random extension core functions. mt_rand()/rand() accept only
+            // zero or two arguments; a min/max range cannot express that
+            // discontinuous arity rule.
+            'mt_rand'           => [
+                'args' => '?i_?i',
+                'argCounts' => [0, 2],
+                'minArgs' => 0,
+                'maxArgs' => 2,
+                'returnType' => Type::INT,
+                'intrinsic' => true,
+            ],
+            'rand'              => [
+                'args' => '?i_?i',
+                'argCounts' => [0, 2],
+                'minArgs' => 0,
+                'maxArgs' => 2,
+                'returnType' => Type::INT,
+                'intrinsic' => true,
+            ],
+            'random_int'        => [
+                'args' => 'i_i',
+                'minArgs' => 2,
+                'maxArgs' => 2,
+                'returnType' => Type::INT,
+                'intrinsic' => true,
+            ],
+            'random_bytes'      => [
+                'args' => 'i',
+                'minArgs' => 1,
+                'maxArgs' => 1,
+                'returnType' => Type::STR,
+                'intrinsic' => true,
+            ],
+            'mt_getrandmax'     => [
+                'args' => '',
+                'minArgs' => 0,
+                'maxArgs' => 0,
+                'returnType' => Type::INT,
+                'constantResult' => '2147483647L',
+                'intrinsic' => true,
+            ],
+            'getrandmax'        => [
+                'args' => '',
+                'minArgs' => 0,
+                'maxArgs' => 0,
+                'returnType' => Type::INT,
+                'constantResult' => '2147483647L',
                 'intrinsic' => true,
             ],
 
@@ -402,6 +451,10 @@ trait FuncCallOptimizer
             $nullables,
         )) {
             return false;
+        }
+
+        if (isset($config['constantResult'])) {
+            return $config['constantResult'];
         }
 
         if (!empty($config['variadic']) || ($refInfo['variadic'] ?? false)) {

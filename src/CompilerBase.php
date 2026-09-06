@@ -3438,16 +3438,27 @@ class CompilerBase implements PropertyAccessContext
     protected function checkInternalFunctionArgCount(string $funcName, Node\Expr\FuncCall $expr): void
     {
         $ref = Reflection::getFunction($funcName);
-        if (!$ref) {
+        if ($ref) {
+            $this->validateInternalNamedCallArgs($ref, $expr->args);
+        }
+        if ($this->hasUnpackCallArg($expr->args)) {
             return;
         }
-        $this->validateInternalNamedCallArgs($ref, $expr->args);
-        if ($this->hasUnpackCallArg($expr->args)) {
+        $actualArgCount = count($expr->args);
+        $config = $this->getFuncCallConfig()[ltrim($funcName, '\\')] ?? null;
+        $allowedArgCounts = is_array($config) ? ($config['argCounts'] ?? null) : null;
+        if (is_array($allowedArgCounts) && !in_array($actualArgCount, $allowedArgCounts, true)) {
+            $expected = implode(' or ', $allowedArgCounts);
+            $this->fatalError(
+                $expr,
+                "{$funcName}() expects exactly {$expected} arguments, {$actualArgCount} given",
+            );
+        }
+        if (!$ref) {
             return;
         }
         $minArgs = $ref->getNumberOfRequiredParameters();
         $maxArgs = $ref->getNumberOfParameters();
-        $actualArgCount = count($expr->args);
         if ($minArgs > 0 && $actualArgCount < $minArgs) {
             $this->fatalError($expr, "{$funcName}() expects at least {$minArgs} argument(s), {$actualArgCount} given");
         }
