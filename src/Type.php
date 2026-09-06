@@ -5,6 +5,7 @@ namespace TypePhp;
 final class Type
 {
     public const string VAR = 'php::Var';
+    public const string ANY = 'php::Var';
     public const string BOOL = 'php::Bool';
     public const string INT = 'php::Int';
     public const string FLOAT = 'php::Float';
