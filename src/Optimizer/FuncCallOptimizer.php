@@ -195,6 +195,45 @@ trait FuncCallOptimizer
                 'intrinsic' => true,
             ],
 
+            // SPL and runtime constant queries. These wrappers preserve
+            // Zend's runtime validation and iterator side effects while
+            // avoiding zend_call_function for ordinary positional calls.
+            'iterator_count'    => [
+                'args' => 'v',
+                'minArgs' => 1,
+                'maxArgs' => 1,
+                'returnType' => Type::INT,
+                'intrinsic' => true,
+            ],
+            'iterator_to_array' => [
+                'args' => 'v_?b',
+                'minArgs' => 1,
+                'maxArgs' => 2,
+                'returnType' => Type::ARRAY,
+                'intrinsic' => true,
+            ],
+            'spl_object_hash'   => [
+                'args' => 'v',
+                'minArgs' => 1,
+                'maxArgs' => 1,
+                'returnType' => Type::STR,
+                'intrinsic' => true,
+            ],
+            'spl_object_id'     => [
+                'args' => 'v',
+                'minArgs' => 1,
+                'maxArgs' => 1,
+                'returnType' => Type::INT,
+                'intrinsic' => true,
+            ],
+            'constant'          => [
+                'args' => 's',
+                'minArgs' => 1,
+                'maxArgs' => 1,
+                'returnType' => Type::ANY,
+                'intrinsic' => true,
+            ],
+
             'strncmp'           => ['constFold' => self::FOLD_CMP3],
             'strncasecmp'       => ['constFold' => self::FOLD_CMP3],
             'explode'           => [],
