@@ -867,7 +867,7 @@ trait AssignOpTrait
             return $pythonOperator;
         }
         $propertyWriteTarget = $this->preparePropertyWriteTarget($node->var);
-        $this->guardLiteralDivisionByZero($node->expr, $op);
+        $this->guardLiteralDivisionByZero($node->var, $node->expr, $op);
 
         // A compound division/modulo on a NATIVE scalar slot with a proven
         // zero divisor cannot fall through to the raw C++ operator (SIGFPE
@@ -876,16 +876,16 @@ trait AssignOpTrait
         // lower the whole expression to the PHP-semantics binary operation
         // and leave the target untouched.
         if (($op === '/=' || $op === '%=')
-            && !$this->nativeTypes
+            && $this->varIntTypes
             && $this->isZeroLiteral($node->expr)
             && $this->isVarExpr($node->var)
             && $this->hasVar((string) $this->parseIdentifier($node->var))
-            && in_array($this->detectVarType($node->var), [Type::INT, Type::FLOAT], true)
+            && $this->detectVarType($node->var) === Type::INT
         ) {
             // std::int()/std::float() values are an explicit opt-in to native
             // C++ arithmetic; changing them to PHP semantics here would be as
             // wrong as the undefined raw operation. Keep the compile-time
-            // rejection native_types mode uses.
+            // rejection used by the default native mode.
             if ($this->isExplicitNativeArithmeticExpr($node->var)) {
                 $this->fatalError($node->expr, 'Cannot divide or modulo by zero');
             }
@@ -1176,14 +1176,14 @@ trait AssignOpTrait
 
         $rightType = $this->detectTypeOfExpr($node->expr);
 
-        // In ordinary PHP mode, an int compound assignment must perform the
+        // In varint mode, an int compound assignment must perform the
         // arithmetic before the typed-property write is validated. The result
         // may therefore be a float (division or integer overflow), in which
         // case Zend rejects the write and leaves the old property value intact.
         // A direct zend_long reference would bypass that behavior completely.
         // Native objects cannot cross the Variant boundary and retain their
         // native C++ property access path.
-        if (!$this->nativeTypes
+        if ($this->varIntTypes
             && $def->type === Type::INT
             && !$this->isNativeObjectClass($this->detectClassOfExpr($node->var->var))
             && in_array($op, ['+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '&=', '|=', '^='], true)

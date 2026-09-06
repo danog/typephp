@@ -1,8 +1,8 @@
 <?php
 
-use native_types;
+use varint_types;
 
-function localLiteralDeclarationInitializerNative(): void
+function localLiteralDeclarationInitializerVarInt(): void
 {
     $integer = 42;
     $negative = -7;

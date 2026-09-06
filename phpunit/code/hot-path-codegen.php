@@ -1,7 +1,5 @@
 <?php
 
-use native_types;
-
 function hotPathTrace(string $value): string
 {
     return $value;

@@ -5026,11 +5026,11 @@ CODE;
             $ssaBuilder->build();
             $this->context->ssaBuilder = $ssaBuilder;
             $this->analyzeStableObjects($ssaBuilder);
-            // Range-proven loop counters are safe to narrow even without
-            // `use native_types`: the optimizer rejects counters whose PHP
+            // Range-proven loop counters are safe to narrow even with
+            // `use varint_types`: the optimizer rejects counters whose PHP
             // integer semantics could widen to float or otherwise escape.
             $optimizedLoopVars = $this->optimizeLoopVars($ssaBuilder);
-            if ($this->nativeTypes) {
+            if (!$this->varIntTypes) {
                 // Narrow local variable types based on SSA analysis.
                 $this->optimizeVarTypes($ssaBuilder);
                 // Narrow native property accesses.

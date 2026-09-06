@@ -2,8 +2,8 @@
 /**
  * Range-proven loop variable optimizer.
  *
- * This pass narrows common PHP loop counters to php::Int without requiring
- * `use native_types`. It is intentionally pattern-based: PHP arithmetic can
+ * This pass narrows common PHP loop counters to php::Int even under
+ * `use varint_types`. It is intentionally pattern-based: PHP arithmetic can
  * widen integers to floats on overflow, so only monotonic counters with a
  * statically bounded range are accepted.
  */

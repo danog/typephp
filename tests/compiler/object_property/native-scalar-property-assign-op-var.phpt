@@ -2,8 +2,6 @@
 Native scalar object property compound assignment checks var RHS before native write
 --FILE--
 <?php
-use native_types;
-
 class NativeScalarAssignOpVarBox
 {
     public int $intValue = 1;

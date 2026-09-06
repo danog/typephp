@@ -226,7 +226,17 @@ trait TypeConversionTrait
         if ($type === Type::FLOAT && $this->decimalTypes) {
             return Type::DECIMAL;
         }
-        return $this->nativeTypes ? $type : Type::VAR;
+        return $type === Type::INT && $this->varIntTypes ? Type::VAR : $type;
+    }
+
+    /**
+     * Whether an inferred scalar has fixed C++ storage in the current file.
+     * Float and bool are always native; varint_types only boxes integers.
+     */
+    protected function usesNativeScalarStorage(string $type): bool
+    {
+        return $this->isNativeType($type)
+            && !($type === Type::INT && $this->varIntTypes);
     }
 
     protected function convertExprFromType(string $type, string $expr): string

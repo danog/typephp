@@ -3,6 +3,7 @@ Runtime int division preserves PHP exact, fractional, overflow and zero-divisor 
 --FILE--
 <?php
 declare(strict_types=1);
+use varint_types;
 
 function divide(int $left, int $right): mixed
 {

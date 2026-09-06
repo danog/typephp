@@ -478,7 +478,11 @@ trait FuncCallOptimizer
             // time()). Reflection lookup failure also uses zero as its
             // unknown sentinel, so only enforce that implicit value when it
             // is greater than zero.
-            if ((array_key_exists('maxArgs', $config) || $maxArgs > 0) && $argCount > $maxArgs) {
+            $variadic = !empty($config['variadic']) || ($refInfo['variadic'] ?? false);
+            if (!$variadic
+                && (array_key_exists('maxArgs', $config) || $maxArgs > 0)
+                && $argCount > $maxArgs
+            ) {
                 $this->fatalError($expr, "{$name}() expects at most {$maxArgs} argument(s), {$argCount} given");
             }
         }

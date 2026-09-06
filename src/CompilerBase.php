@@ -488,7 +488,8 @@ class CompilerBase implements PropertyAccessContext
     protected array $nativeClassDeclarations = [];
     /** @var array<string, true> Request-reset initialization flags for Native static locals. */
     protected array $nativeStaticInitializers = [];
-    protected bool $nativeTypes = false;
+    /** Box inferred integer locals in php::Var to retain Zend integer widening semantics. */
+    protected bool $varIntTypes = false;
     protected bool $decimalTypes = false;
     protected bool $bigintTypes = false;
     protected string $rootPath;
@@ -1050,7 +1051,7 @@ class CompilerBase implements PropertyAccessContext
     protected function resetFile(): void
     {
         $this->indentLevel = 0;
-        $this->nativeTypes = false;
+        $this->varIntTypes = false;
         $this->decimalTypes = false;
         $this->bigintTypes = false;
         $this->classesDefineInFile = [];
@@ -2489,13 +2490,12 @@ class CompilerBase implements PropertyAccessContext
         }
         // The return value of the actual function.
         $type = $this->detectTypeOfExpr($v->expr);
-        // In ordinary PHP mode, int +/−/* int is only conditionally an int:
+        // In varint mode, int +/−/* int is only conditionally an int:
         // runtime overflow promotes the result to float. Keep the Variant
         // representation through the return boundary so a declared scalar
         // return type observes and rejects that float exactly as PHP does.
-        // `use native_types` intentionally opts into native C++ arithmetic
-        // semantics and is therefore excluded from this check.
-        if (!$this->nativeTypes && $type === Type::INT && $this->exprCanOverflowInt($v->expr)) {
+        // Native C++ arithmetic is the default and is therefore excluded.
+        if ($this->varIntTypes && $type === Type::INT && $this->exprCanOverflowInt($v->expr)) {
             $type = Type::VAR;
         }
         $nativeExpressionClass = $this->detectClassOfExpr($v->expr);
@@ -3009,7 +3009,7 @@ class CompilerBase implements PropertyAccessContext
             case 'Expr_UnaryPlus':
                 $innerType = $this->detectTypeOfExpr($expr->expr);
                 if (
-                    !$this->nativeTypes
+                    $this->varIntTypes
                     && $exprType === 'Expr_UnaryMinus'
                     && $innerType === Type::INT
                     && $this->constantIntValue($expr->expr) === PHP_INT_MIN
@@ -3097,7 +3097,7 @@ class CompilerBase implements PropertyAccessContext
                 if ($leftType === Type::FLOAT || $rightType === Type::FLOAT) {
                     return Type::FLOAT;
                 }
-                if (!$this->nativeTypes && $leftType === Type::INT && $rightType === Type::INT) {
+                if ($this->varIntTypes && $leftType === Type::INT && $rightType === Type::INT) {
                     $op = match ($exprType) {
                         'Expr_BinaryOp_Plus' => '+',
                         'Expr_BinaryOp_Minus' => '-',

@@ -512,7 +512,7 @@ trait PropertyAccessTrait
             $nativeProp = $resolution->expression;
             $def = $this->getNativePropertyDef($expr);
             $class = $resolution->class;
-            if ($this->nativeTypes && $def && $class !== null) {
+            if ($def && $class !== null && $this->usesNativeScalarStorage($def->type)) {
                 $this->setNativePropertyValueSource($expr, self::NATIVE_PROPERTY_VALUE_VAR);
                 return $this->emitNativeStaticPropertyTypedFetch($expr, $class, $def, $nativeProp);
             }
@@ -1244,7 +1244,7 @@ trait PropertyAccessTrait
             $getProperty = $objectVar . '.attr(' . $id . ', ' . $this->escapeAttrMode($update) . ')';
         }
         $def = $this->getNativePropertyDef($expr);
-        if ($def and $this->nativeTypes) {
+        if ($def && $this->usesNativeScalarStorage($def->type)) {
             $propName = $this->parseIdentifier($property);
             $typedFetch = $this->emitNativeInstancePropertyTypedFetch(
                 $expr,

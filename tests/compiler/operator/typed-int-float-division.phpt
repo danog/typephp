@@ -3,6 +3,7 @@ Typed int and float division follows PHP semantics (fractional result, DivisionB
 --FILE--
 <?php
 declare(strict_types=1);
+use varint_types;
 
 function divInts(int $a, int $b): float
 {

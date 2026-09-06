@@ -34,6 +34,9 @@ final class CtypeOptimizerTest extends BaseTest
         }
         self::assertStringNotContainsString('get_persistent_func', $code);
         self::assertStringNotContainsString('php::call(', $code);
-        self::assertStringContainsString('result = php::fn::ctype_alnum(_php__var__char);', $code);
+        self::assertStringContainsString(
+            'result = php::toBool(php::fn::ctype_alnum(_php__var__char));',
+            $code,
+        );
     }
 }

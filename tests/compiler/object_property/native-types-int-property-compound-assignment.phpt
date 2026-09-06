@@ -2,8 +2,6 @@
 Native-types int property compound assignments use C++ integer semantics
 --FILE--
 <?php
-use native_types;
-
 class NativeTypesIntCompoundBox
 {
     public int $value = 0;

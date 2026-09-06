@@ -143,8 +143,8 @@ final class Type
     public const string Box = 'box';
 }
 
-/** @deprecated Compiler directive retained independently of public type symbols. */
-class native_types
+/** Compiler directive that opts inferred integer locals into Variant storage. */
+class varint_types
 {
 }
 
