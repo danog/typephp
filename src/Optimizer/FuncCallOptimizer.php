@@ -81,9 +81,9 @@ trait FuncCallOptimizer
             'version_compare', 'gettype',
             'is_array', 'is_string', 'is_object', 'is_resource',
             'is_scalar', 'is_numeric', 'is_countable', 'is_iterable',
-            'array_is_list', 'is_dir', 'is_file', 'file_exists', 'realpath', 'time',
+            'array_is_list', 'is_dir', 'is_file', 'file_exists', 'realpath',
             'in_array', 'array_search',
-            'date', 'strtotime', 'md5', 'sha1', 'hash', 'print_r',
+            'strtotime', 'md5', 'sha1', 'hash', 'print_r',
             'base64_encode', 'base64_decode',
             'urlencode', 'urldecode', 'rawurlencode', 'rawurldecode',
             'json_encode', 'json_decode', 'serialize', 'unserialize',
@@ -120,6 +120,31 @@ trait FuncCallOptimizer
             'str_starts_with'   => [],
             'str_ends_with'     => [],
             'str_contains'      => [],
+
+            // Date/time core functions. Keep their ABI explicit so these
+            // calls never depend on runtime Reflection metadata or fall back
+            // to php::call() when the arguments have proven scalar types.
+            'time'              => [
+                'args' => '',
+                'minArgs' => 0,
+                'maxArgs' => 0,
+                'returnType' => Type::INT,
+                'intrinsic' => true,
+            ],
+            'date'              => [
+                'args' => 's_?i',
+                'minArgs' => 1,
+                'maxArgs' => 2,
+                'returnType' => Type::STR,
+                'intrinsic' => true,
+            ],
+            'gmdate'            => [
+                'args' => 's_?i',
+                'minArgs' => 1,
+                'maxArgs' => 2,
+                'returnType' => Type::STR,
+                'intrinsic' => true,
+            ],
 
             'strncmp'           => ['constFold' => self::FOLD_CMP3],
             'strncasecmp'       => ['constFold' => self::FOLD_CMP3],
@@ -361,7 +386,11 @@ trait FuncCallOptimizer
             if ($argCount < $minArgs) {
                 $this->fatalError($expr, "{$name}() expects at least {$minArgs} argument(s), {$argCount} given");
             }
-            if ($maxArgs > 0 && $argCount > $maxArgs) {
+            // An explicit zero is a real zero-argument limit (for example
+            // time()). Reflection lookup failure also uses zero as its
+            // unknown sentinel, so only enforce that implicit value when it
+            // is greater than zero.
+            if ((array_key_exists('maxArgs', $config) || $maxArgs > 0) && $argCount > $maxArgs) {
                 $this->fatalError($expr, "{$name}() expects at most {$maxArgs} argument(s), {$argCount} given");
             }
         }
