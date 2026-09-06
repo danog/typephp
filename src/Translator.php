@@ -143,6 +143,11 @@ class Translator extends Preprocessor
             }
             $this->internalFunctions[$functionName] = true;
         }
+        foreach ($this->getFuncCallConfig() as $functionName => $config) {
+            if (is_array($config) && ($config['intrinsic'] ?? false)) {
+                $this->internalFunctions[$functionName] = true;
+            }
+        }
         unset($this->internalFunctions[self::ENTRY_FUNCTION]);
         $this->internalConstants = $this->loadInternalConstants();
         if ($this->climate->arguments->defined('help')) {

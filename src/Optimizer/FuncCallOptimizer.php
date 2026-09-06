@@ -38,6 +38,20 @@ trait FuncCallOptimizer
     protected const int FOLD_KNOWN_CONSTANT = 7;
     protected const int FOLD_SSA_TYPE = 8;
 
+    protected const array CTYPE_FUNCTIONS = [
+        'ctype_alnum',
+        'ctype_alpha',
+        'ctype_cntrl',
+        'ctype_digit',
+        'ctype_lower',
+        'ctype_graph',
+        'ctype_print',
+        'ctype_punct',
+        'ctype_space',
+        'ctype_upper',
+        'ctype_xdigit',
+    ];
+
     /** @var array<string,string|array>|null */
     protected ?array $_funcCallConfig = null;
 
@@ -196,6 +210,19 @@ trait FuncCallOptimizer
             'is_callable'        => ['handler' => 'genIsCallable'],
         ];
 
+        // PHPX implements these directly with <cctype>. They remain
+        // available even when the target libphp has no ext/ctype.
+        foreach (self::CTYPE_FUNCTIONS as $name) {
+            $extra[$name] = [
+                'args' => 'v',
+                'minArgs' => 1,
+                'maxArgs' => 1,
+                'namedArgs' => ['text'],
+                'returnType' => Type::BOOL,
+                'intrinsic' => true,
+            ];
+        }
+
         $config = $extra;
         foreach ($simple as $name) {
             if (!isset($config[$name])) {
@@ -211,6 +238,11 @@ trait FuncCallOptimizer
 
     protected function parseFuncCallWithOptimizer(string $name, Node\Expr\FuncCall $expr): string|false
     {
+        $config = $this->getFuncCallConfig()[$name] ?? null;
+        if ($config === null) {
+            return false;
+        }
+
         foreach ($expr->args as $arg) {
             if ($this->isPlaceholderExpr($arg)) {
                 return false;
@@ -219,14 +251,21 @@ trait FuncCallOptimizer
             // with the syntactic argument list. Named arguments and unpacking
             // require Zend's runtime binding/expansion semantics, so reject
             // them before any optimizer-specific handler can consume them.
-            if ($arg instanceof Node\Arg && ($arg->name !== null || $arg->unpack)) {
-                return false;
+            if ($arg instanceof Node\Arg) {
+                if ($arg->unpack) {
+                    return false;
+                }
+                if ($arg->name !== null) {
+                    $namedArgs = $config['namedArgs'] ?? null;
+                    if ($namedArgs === null) {
+                        return false;
+                    }
+                    $argName = $arg->name->toString();
+                    if (!in_array($argName, $namedArgs, true)) {
+                        $this->fatalError($arg, "Unknown named parameter \${$argName}");
+                    }
+                }
             }
-        }
-
-        $config = $this->getFuncCallConfig()[$name] ?? null;
-        if ($config === null) {
-            return false;
         }
 
         // Optimized php::fn::* calls must obey the same ZendVM escape boundary
@@ -256,7 +295,10 @@ trait FuncCallOptimizer
             if (!$arg instanceof Node\Arg) {
                 continue;
             }
-            if ($this->isVarExpr($arg->value) && is_string($arg->value->name) && !$this->hasVar($arg->value->name)) {
+            if ($this->isVarExpr($arg->value)
+                && is_string($arg->value->name)
+                && !$this->hasVar($this->parseIdentifier($arg->value))
+            ) {
                 return false;
             }
         }
@@ -290,9 +332,11 @@ trait FuncCallOptimizer
 
     protected function dispatchFuncCall(string $name, Node\Expr\FuncCall $expr, array $config): string|false
     {
-        // Named arguments and unpack (...) expansion require runtime handling; fall back to the dynamic call path.
+        // Unpack expansion and ordinary named arguments require runtime
+        // handling. Single-argument intrinsics may opt in after validating
+        // their stable PHP parameter name in parseFuncCallWithOptimizer().
         foreach ($expr->args as $arg) {
-            if ($arg->name !== null || $arg->unpack) {
+            if ($arg->unpack || ($arg->name !== null && !isset($config['namedArgs']))) {
                 return false;
             }
         }
@@ -309,6 +353,18 @@ trait FuncCallOptimizer
         $defaults = $config['defaults'] ?? [];
         $variadicType = $config['variadicType'] ?? ($refInfo['variadicType'] ?? '');
         $nullables = $refInfo['nullables'] ?? [];
+
+        if (!$this->hasUnpackCallArg($expr->args)) {
+            $argCount = count($expr->args);
+            $minArgs = $config['minArgs'] ?? ($refInfo['minArgs'] ?? 0);
+            $maxArgs = $config['maxArgs'] ?? ($refInfo['maxArgs'] ?? 0);
+            if ($argCount < $minArgs) {
+                $this->fatalError($expr, "{$name}() expects at least {$minArgs} argument(s), {$argCount} given");
+            }
+            if ($maxArgs > 0 && $argCount > $maxArgs) {
+                $this->fatalError($expr, "{$name}() expects at most {$maxArgs} argument(s), {$argCount} given");
+            }
+        }
 
         if (!$this->hasOptimizerSafeTypedArguments(
             $expr,

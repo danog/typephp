@@ -4704,6 +4704,10 @@ class CompilerBase implements PropertyAccessContext
     protected function detectFuncCallReturnType(string $name): string
     {
         $name = ltrim($name, '\\');
+        $config = $this->getFuncCallConfig()[$name] ?? null;
+        if (is_array($config) && isset($config['returnType'])) {
+            return $config['returnType'];
+        }
         $returnType = Reflection::getFunctionReturnType($name);
         if ($returnType !== null) {
             return $this->getTypeFromZendType($returnType);
