@@ -72,7 +72,7 @@ static NSInteger store_control(NSControl *control)
     return controlId;
 }
 
-void php_macos_app_init(php::Str applicationName)
+void php_ui_app_init(php::Str applicationName)
 {
     @autoreleasepool {
         NSApplication *application = NSApplication.sharedApplication;
@@ -83,7 +83,7 @@ void php_macos_app_init(php::Str applicationName)
     }
 }
 
-void php_macos_create_window(php::Str title, php::Int width, php::Int height)
+void php_ui_create_window(php::Str title, php::Int width, php::Int height)
 {
     @autoreleasepool {
         const NSRect frame = NSMakeRect(0, 0, static_cast<CGFloat>(width), static_cast<CGFloat>(height));
@@ -103,7 +103,7 @@ void php_macos_create_window(php::Str title, php::Int width, php::Int height)
     }
 }
 
-php::Int php_macos_add_label(
+php::Int php_ui_add_label(
     php::Str text,
     php::Int x,
     php::Int y,
@@ -130,7 +130,7 @@ php::Int php_macos_add_label(
     }
 }
 
-php::Int php_macos_add_button(
+php::Int php_ui_add_button(
     php::Str title,
     php::Int x,
     php::Int y,
@@ -154,7 +154,7 @@ php::Int php_macos_add_button(
     }
 }
 
-void php_macos_set_control_text(php::Int controlId, php::Str text)
+void php_ui_set_control_text(php::Int controlId, php::Str text)
 {
     @autoreleasepool {
         NSControl *control = bridge.controls[@(static_cast<NSInteger>(controlId))];
@@ -164,7 +164,7 @@ void php_macos_set_control_text(php::Int controlId, php::Str text)
     }
 }
 
-void php_macos_show_window()
+void php_ui_show_window()
 {
     @autoreleasepool {
         [bridge.window makeKeyAndOrderFront:nil];
@@ -173,7 +173,7 @@ void php_macos_show_window()
     }
 }
 
-php::Int php_macos_next_event()
+php::Int php_ui_next_event()
 {
     while (bridge.running) {
         @autoreleasepool {

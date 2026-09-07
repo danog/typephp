@@ -1,8 +1,9 @@
 <?php
 
-/** Thin wrappers around the macOS AppKit API. */
-function ui_app_init(string $applicationName): void {}
+/** Enter the UIKit-owned iOS application lifecycle. */
+function ui_app_run(string $applicationName): void {}
 
+/** Thin wrappers around UIKit; coordinates use the shared 640x380 logical canvas. */
 function ui_create_window(string $title, int $width, int $height): void {}
 
 function ui_add_label(
@@ -20,6 +21,3 @@ function ui_add_button(string $title, int $x, int $y, int $width, int $height): 
 function ui_set_control_text(int $controlId, string $text): void {}
 
 function ui_show_window(): void {}
-
-/** Return the activated control ID, or -1 after the window is closed. */
-function ui_next_event(): int {}

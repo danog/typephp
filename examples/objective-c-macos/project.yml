@@ -5,7 +5,8 @@ output: typephp_macos_hello
 cxx-std: c++17
 
 sources:
-  - php-src
+  - php-src/application.php
+  - php-src/main.php
   - objc-src
 
 cxx-flags:

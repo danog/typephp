@@ -42,6 +42,7 @@ use TypePhp\Generator\LibraryImportStubGenerator;
 use TypePhp\Generator\Symbol;
 use TypePhp\Metadata\Constants;
 use TypePhp\Platform\PlatformFactory;
+use TypePhp\Platform\Ios;
 use TypePhp\Platform\Wasi;
 use TypePhp\Platform\Windows;
 use TypePhp\Resolver\Reflection;
@@ -213,7 +214,12 @@ class Translator extends Preprocessor
             if ($targetPlatform === 'wasm32-wasip1' || $targetPlatform === 'wasm32-wasi') {
                 throw new \RuntimeException('WASI Preview 1 is not supported; use wasm32-wasip2');
             }
-            if ($targetPlatform === 'wasm32-wasip2' || $targetPlatform === 'wasm32-unknown-wasip2') {
+            if (Ios::supportsTarget($targetPlatform)) {
+                if (strtoupper(substr(PHP_OS, 0, 6)) !== 'DARWIN') {
+                    throw new \RuntimeException('The iOS target requires a macOS build host with Xcode');
+                }
+                $this->platform = new Ios();
+            } elseif ($targetPlatform === 'wasm32-wasip2' || $targetPlatform === 'wasm32-unknown-wasip2') {
                 $detectedTarget = getenv('TYPEPHP_WASI_TARGET');
                 $this->platform = new Wasi(
                     is_string($detectedTarget) && $detectedTarget !== '' ? $detectedTarget : $targetPlatform,
@@ -1026,7 +1032,7 @@ class Translator extends Preprocessor
             $code .= 'extern "C" void save_ps_args(int, char **) {}' . PHP_EOL;
         }
 
-        if ($this->isBuildModeBin() && !$this->isWasiTarget()) {
+        if ($this->isBuildModeBin() && !$this->isWasiTarget() && !$this->isIosTarget()) {
             $cliHeaders = [
                 '#include "php_cli_process_title.h"',
                 '#include "php_cli_process_title_arginfo.h"',
@@ -1225,7 +1231,7 @@ CODE;
 
         $code .= "// clang-format off\n";
         $code .= "static const zend_function_entry ext_functions[] = {\n";
-        if ($this->isBuildModeBin() && !$this->isWasiTarget()) {
+        if ($this->isBuildModeBin() && !$this->isWasiTarget() && !$this->isIosTarget()) {
             $code .= $this->getIndent() . "PHP_FE(cli_set_process_title,        arginfo_cli_set_process_title)\n";
             $code .= $this->getIndent() . "PHP_FE(cli_get_process_title,        arginfo_cli_get_process_title)\n";
         }
@@ -1808,7 +1814,7 @@ CODE;
             $sourceFiles[] = $this->getPhpxDir() . '/src/misc/typephp_main.cc';
         }
 
-        if ($this->isBuildModeBin() && !$this->isWasiTarget()) {
+        if ($this->isBuildModeBin() && !$this->isWasiTarget() && !$this->isIosTarget()) {
             $sourceFiles[] = $this->getPhpxDir() . '/src/misc/php_cli_process_title.c';
             $sourceFiles[] = $this->getPhpxDir() . '/src/misc/ps_title.c';
         }
@@ -2859,6 +2865,15 @@ CODE;
         $targetPlatform = $cfg['target-platform'] ?? null;
         if (!empty($targetPlatform)) {
             $this->targetPlatform = (string) $targetPlatform;
+            if (Ios::supportsTarget($this->targetPlatform)) {
+                if (strtoupper(substr(PHP_OS, 0, 6)) !== 'DARWIN') {
+                    $this->error('The iOS target requires a macOS build host with Xcode');
+                }
+                $this->platform = new Ios();
+                $this->compilerBackend = null;
+                $this->cppCompiler = $this->platform->getDefaultCompiler();
+                $this->initializeNewArchitecture();
+            }
         }
 
         // Read build-dir
