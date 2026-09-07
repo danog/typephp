@@ -977,7 +977,7 @@ class CompilerBase implements PropertyAccessContext
         return $this->getPlatform()->removeCommonPrefix($short, $long);
     }
 
-    protected function getVarType(string $name): string
+    protected function getRawVarType(string $name): string
     {
         if ($this->hasLocalVar($name)) {
             return $this->context->localVars[$name];
@@ -987,6 +987,16 @@ class CompilerBase implements PropertyAccessContext
         }
 
         return Type::VAR;
+    }
+
+    /**
+     * Return the value type visible to expressions. A native C++ reference has
+     * the same operators and assignment rules as its referenced value; only
+     * ABI/binding code should inspect getRawVarType().
+     */
+    protected function getVarType(string $name): string
+    {
+        return Type::getReferencedType($this->getRawVarType($name));
     }
 
     /**
@@ -4984,7 +4994,9 @@ class CompilerBase implements PropertyAccessContext
         if ($toType === Type::VAR or $fromType === Type::VAR) {
             return true;
         }
-        // References currently carry no type information, so treat them as var.
+        $toType = Type::getReferencedType($toType);
+        $fromType = Type::getReferencedType($fromType);
+        // Dynamic references carry no compile-time target type, so treat them as var.
         if ($toType === Type::REF or $fromType === Type::REF) {
             return true;
         }

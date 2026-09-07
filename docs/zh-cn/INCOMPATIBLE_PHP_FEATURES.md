@@ -49,11 +49,12 @@
 - 动态调用、闭包调用等编译期无法确定参数签名的调用，不能自动转换引用参数；需要显式使用 `std::ref()` 或等价关键词方法 `toRef()`。
 - `std::ref()` / `toRef()` 只接受变量、数组元素或对象属性。
 - 采用固定存储的局部变量（`Int`、`Float`、`Bool`、`Str`、`Array`、`Object`、
-  `Stream`、高精度值或 `std` 容器）不能转换为 PHP 引用。Zend 引用没有类型约束，
-  可能把固定存储替换成不兼容的值。对象、stream、typed object 与 `std` 容器本身
-  已采用句柄或引用式值语义，再对局部变量建立 PHP 引用也没有意义。确需 PHP 引用
-  语义时，应使用 `std::any()` 初始化，完成引用操作后再通过 `toArray()`、
-  `toString()` 等关键词显式转换回来。
+  `Stream`、高精度值或 `std` 容器）不能转换为 PHP 引用。普通局部引用没有 Zend
+  type source，可能把固定存储替换成不兼容的值。对象、stream、typed object 与
+  `std` 容器本身已采用句柄或引用式值语义，再对局部变量建立 PHP 引用也没有意义。
+  Typed Property 仍可取引用，Zend 会将属性元数据附加到引用上；PHP 数组元素仍是
+  可取引用的动态槽位。局部变量确需 PHP 引用语义时，应使用 `std::any()` 初始化，
+  完成引用操作后再通过 `toArray()`、`toString()` 等关键词显式转换回来。
 - 带 unpack 且尾部追加 named arguments 的调用会退化为动态调用，不能使用 native call。
 
 ## 对象模型

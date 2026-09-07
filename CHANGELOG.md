@@ -27,9 +27,12 @@ to files that genuinely depend on Zend integer widening semantics.
 
 Fixed-storage locals can no longer be converted to PHP references. This rule
 applies to native scalars, strings, arrays, objects, streams, high-precision
-values, and `std` containers. Zend references are untyped, so allowing one to
-alias fixed C++ storage could corrupt the variable's type. Use `std::any()`
-before reference operations and explicitly convert the result back afterward.
+values, and `std` containers. A reference made from an ordinary local has no
+Zend type source, so exposing fixed C++ storage through it could corrupt the
+variable's type. Typed object/static properties remain reference-capable: Zend
+records their property metadata as a type source. PHP array elements remain
+dynamic reference-capable slots. Use `std::any()` when a local needs reference
+semantics and explicitly convert the result back afterward.
 
 TypePHP is always strict. Project sources no longer need
 `declare(strict_types=1)`; the directive remains accepted as a redundant PHP
@@ -98,8 +101,10 @@ should review the change log and run their full test suite before upgrading.
 `use native_types`，并且只为真正依赖 Zend 整数扩展语义的文件添加新兼容模式。
 
 固定存储的局部变量不再允许转换为 PHP 引用，包括原生标量、字符串、数组、对象、
-stream、高精度值和 `std` 容器。Zend 引用没有类型约束，若允许其指向固定 C++ 存储，
-可能破坏变量类型。需要引用操作时先使用 `std::any()`，操作完成后再显式转换回目标类型。
+stream、高精度值和 `std` 容器。普通局部变量产生的引用没有 Zend type source，若允许
+其指向固定 C++ 存储，可能破坏变量类型。Typed Property 仍然可以取引用：Zend 会把属性
+元数据记录为 type source；PHP 数组元素也仍是可取引用的动态槽位。局部变量需要引用
+语义时先使用 `std::any()`，操作完成后再显式转换回目标类型。
 
 TypePHP 始终使用严格类型，项目源码不再需要 `declare(strict_types=1)`。该声明仍作为
 冗余的 PHP 兼容语法被接受，而 `strict_types=0` 会被拒绝。

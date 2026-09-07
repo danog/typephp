@@ -105,13 +105,15 @@ incompatible with or more restrictive than standard PHP.
   properties.
 - A local with fixed storage (`Int`, `Float`, `Bool`, `Str`, `Array`, `Object`,
   `Stream`, high-precision values, or a `std` container) cannot be made into a
-  PHP reference. Zend references are untyped and could replace such storage
-  with an incompatible value. Objects, streams, typed objects, and `std`
-  containers already use handle/reference-like value semantics, so adding a
-  PHP reference to the local variable is unnecessary as well. Initialize the
-  value with `std::any()` when PHP reference semantics are required, then
-  convert it back explicitly with a keyword such as `toArray()` or
-  `toString()`.
+  PHP reference. An ordinary local reference has no Zend type source and could
+  replace such storage with an incompatible value. Objects, streams, typed
+  objects, and `std` containers already use handle/reference-like value
+  semantics, so adding a PHP reference to the local variable is unnecessary as
+  well. Typed object/static properties remain reference-capable because Zend
+  attaches their property metadata to the reference; PHP array elements remain
+  dynamic reference-capable slots. Initialize a local with `std::any()` when
+  PHP reference semantics are required, then convert it back explicitly with a
+  keyword such as `toArray()` or `toString()`.
 - A call that uses argument unpacking followed by named arguments falls back to
   dynamic dispatch and cannot use the native call path.
 
