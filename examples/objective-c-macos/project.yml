@@ -1,0 +1,16 @@
+name: objective_c_macos
+version: 0.1.0
+mode: bin
+output: typephp_macos_hello
+cxx-std: c++17
+
+sources:
+  - php-src
+  - objc-src
+
+cxx-flags:
+  - -fobjc-arc
+
+ld-flags:
+  - -framework AppKit
+  - -framework Foundation
