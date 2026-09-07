@@ -2,6 +2,8 @@
 Native int property assignment follows strict property type rules
 --FILE--
 <?php
+use varint_types;
+
 class GridSize
 {
     public int $size = 0;

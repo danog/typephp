@@ -43,7 +43,6 @@ php::Int &alias = value;
 - `isTypedRefType($type)`：是否为五种 typed-ref；
 - `getReferenceType($type)`：值类型转为 typed-ref；
 - `getReferencedType($type)`：typed-ref 转为值类型；
-- `getReferenceCppType($type)`：生成 `T &` ABI；
 - `isAnyRefType($type)`：typed-ref 或动态 `REF`。
 
 SSA 只能保留或缩窄引用目标类型，不得把 typed-ref 提升成 `VAR/REF`。
@@ -108,16 +107,21 @@ php::RefWrap<php::Str> bridge(property);
 php_update_name(bridge.typed());
 ```
 
-构造时必须验证当前值类型。`Int/Float` 可以直接引用 reference 内部 `zval`
-payload；`Str/Array` 使用安全的 indirect wrapper，使原生函数的每次写入仍作用于
-原始槽位。Zend 的 `bool` 只编码为 `IS_TRUE/IS_FALSE` 类型标签，并不存在可取地址
-的 `bool` payload，因此 `Bool&` 必须使用栈上代理，并在本次调用结束时写回。
-typed-ref 函数只能写入 `T`，因此不会破坏属性类型。
+构造时必须验证当前值类型。跨 Zend 边界的性能不属于 typed-ref 的零成本目标，因此
+五种类型统一使用隔离代理，不直接暴露 `zend_reference` 内部 payload。这样即使原始
+reference 在 typed-ref 函数重入 ZendVM 时被其他动态别名改成另一种类型，也不会让
+`T&` 指向已经失效的 zval union member。
+
+调用结束时比较入口快照、原始 reference 和代理：只有一侧发生修改时执行安全写回；
+双方发生不同修改时抛出冲突错误，不能静默覆盖。`Array` 还必须比较 HashTable 身份，
+因为“返回数组元素引用”会改变引用拓扑，即使数组值比较结果完全相同。数组代理使用
+独立副本，避免 persistent/default HashTable 与 request 写路径混用；字符串代理也必须
+持有 request-owned 存储，不能原地修改 persistent string。
 
 ## typed-ref 转换为动态 PHP 引用
 
 动态函数、动态方法和 Closure 的引用签名在编译期不可确定。调用者显式使用
-`std::ref()` 时，`php::RefWrap<T>` 为 typed local 创建临时 `php::Ref`：
+`std::ref()` 时，`php::RefWrap<T>` 为 typed local 提供真实的 `php::Ref`：
 
 ```cpp
 php::Int value = 1;
@@ -128,6 +132,8 @@ bridge.commit();
 
 `commit()` 必须检查动态调用后的 zval 仍与 `T` 一致，然后写回 typed local；
 类型不一致时抛出统一的 TypeError。不能依赖一个可能抛异常的析构函数完成检查。
+这是明确的动态慢路径，可以继续按调用创建 Zend reference，不为减少分配引入函数级
+缓存、复用状态或额外的引用身份管理。
 
 桥接生命周期必须是“一次调用表达式”，不能是整个 PHP 语句。嵌套调用中，内层
 调用返回后，必须在求值外层调用的下一个实参之前完成 `commit()`：
@@ -136,10 +142,11 @@ bridge.commit();
 outer(dynamicCall(std::ref($value)), nextArgument());
 ```
 
-这里 `dynamicCall()` 的写回必须先于 `nextArgument()`。因此不能用语句级
-`beforeStmtLines/afterStmtLines` 实现，而应把 wrapper、调用、成功写回和异常写回
-统一放入一个立即执行的表达式 helper/lambda 中。多个 typed-ref 实参若指向同一变量，
-必须复用同一个 bridge，不能创建内容互相覆盖的临时 reference。
+这里 `dynamicCall()` 的写回必须先于 `nextArgument()`。生成器可以使用立即执行
+lambda，也可以捕获并在独立 C++ block 中输出该内层调用的
+`beforeStmtLines/afterStmtLines`；关键是 wrapper、调用和成功/异常写回必须属于同一个
+求值边界。多个 typed-ref 实参若指向同一变量，必须复用同一个 bridge，不能创建内容
+互相覆盖的临时 reference。
 
 调用抛出异常时，桥接层仍要按 PHP 的可观察语义处理已经发生的引用修改。生成代码
 必须在重新抛出原异常前执行非破坏性的写回；若写回又发现类型错误，以类型错误替换
@@ -150,19 +157,19 @@ Zend 异常处理代码。
 
 `RefWrap<T>` 有两种互斥状态：
 
-1. `T& -> php::Ref`：为动态调用创建临时 Zend reference，调用结束后验证并写回；
+1. `T& -> php::Ref`：为动态调用创建 Zend reference，调用结束后验证并写回；
 2. `php::Ref -> T&`：为静态 typed-ref 参数提供原生引用视图。
 
-建议内部状态明确表示为 `NativeToZend`、`ConstrainedZendToNative`、
-`DynamicZendToNative`，禁止用若干松散布尔值组合隐含方向。
+内部只区分 `T& -> php::Ref` 与 `php::Ref -> T&` 两种方向；成功提交后必须进入
+`committed` 状态，保证显式 `commit()` 与 `noexcept` 析构不会重复写回。
 
-| `T` | `php::Ref -> T&` 实现 | 是否需要写回代理 |
+| `T` | `php::Ref -> T&` 代理 | 额外要求 |
 | --- | --- | --- |
-| `Int` | 直接指向 `Z_LVAL_P(refval)` | 否 |
-| `Float` | 直接指向 `Z_DVAL_P(refval)` | 否 |
-| `Bool` | 栈上 `Bool` 代理 | 是 |
-| `Str` | 指向 refval 的 indirect `Str` | 否 |
-| `Array` | 指向 refval 的 indirect `Array` | 否 |
+| `Int` | 栈上 `Int` | 精确 `IS_LONG` |
+| `Float` | 栈上 `Float` | 精确 `IS_DOUBLE`；固定 `Int&` 不隐式改成 `Float&` |
+| `Bool` | 栈上 `Bool` | `IS_TRUE/IS_FALSE` |
+| `Str` | request-owned `Str` | 禁止原地修改 persistent string |
+| `Array` | 独立 `Array` 副本 | 同时检测内容与 HashTable/引用拓扑变化 |
 
 `Bool` 不能直接映射的原因来自 Zend ABI：布尔值由 zval 的 `IS_TRUE/IS_FALSE`
 类型标签表达，没有独立的 `bool` payload。
@@ -171,15 +178,10 @@ Zend 异常处理代码。
 可能还有其他动态别名；typed 函数内部若发生重入调用，动态代码可能把同一个 refval
 改成其他类型。随后继续通过 `Int&/Float&` 访问已经不再活动的 union member 是不安全的。
 
-因此 `php::Ref -> T&` 分成两种安全级别：
-
-- reference 带有与 `T` 一致的 Zend typed-property type source：Zend 会阻止重入代码
-  改变类型，`Int/Float/Str/Array` 可以直接映射；
-- 普通无 type source 的 reference：必须使用隔离代理。调用结束时比较原始 reference
-  与入口快照，检测重入别名修改；出现双方同时修改的冲突时抛出明确错误，不能静默覆盖。
-
-`Bool` 在两种情况下都使用代理。直接映射前必须检查 reference 的全部 type sources，
-不能仅凭当前 `Z_TYPE` 推断其以后不会改变。
+因此 `php::Ref -> T&` 不按 type source 选择不同内存模型。Typed Property 的 type
+source 仍由 `Reference::operator=()` 在提交时执行 Zend 类型约束，但它不成为暴露裸
+payload 的理由。统一代理牺牲的是动态桥接路径的少量性能，换取更简单、可验证的生命
+周期规则；静态 TypePHP `T& -> T&` 主路径完全不经过这里。
 
 ### 调用表达式边界
 
@@ -200,19 +202,18 @@ outer(first(), second()); // first/second 谁先执行未指定
 ```cpp
 auto result = [&]() {
     php::RefWrap<php::Int> bridge(value);
-    try {
-        auto retval = dynamic_call(bridge.ref());
-        bridge.commit();
-        return retval;
-    } catch (zend_object *) {
-        bridge.commitAfterException();
-        throw;
-    }
+    auto retval = dynamic_call(bridge.ref());
+    bridge.commit();
+    return retval;
 }();
 ```
 
-这里 `commit()` 和 `bridge` 析构都发生在 lambda 产生结果之前。外层
-`VarList{inner(), next()}` 才能保证 `inner()` 写回先于 `next()`。
+正常返回由显式 `commit()` 完成全部校验；若调用抛出异常，C++ 栈展开会在离开 lambda
+前执行 `noexcept` 析构，只提交类型兼容的既有修改并保留原异常。`commitAfterException()`
+属于 `RefWrap` 私有实现，生成代码不直接调用它。这里 `commit()` 和 bridge 的析构都在
+lambda 产生结果之前。使用生成语句与局部 block 时必须保持相同边界。外层
+`VarList{inner(), next()}` 才能保证 `inner()` 写回先于 `next()`；不能依赖外层
+full-expression 的析构时机。
 
 ### 异常路径
 
@@ -233,7 +234,7 @@ C++ 异常。这个规则必须集中在 helper 中，析构函数始终保持 `
 
 ### 别名与逃逸
 
-同一次动态调用中，如果两个实参最终拥有相同引用根，必须复用一个 `RefWrap`：
+同一次动态调用中，如果实参最终拥有相同引用根，必须复用一个 `RefWrap`：
 
 ```php
 $b =& $a;
@@ -245,10 +246,14 @@ $callback(std::ref($b), std::ref($d));
 身份。编译器应按 `typedRefRoots` 对 bridge 去重。
 
 动态 PHP 代码还可能把引用保存到全局、对象属性或 Closure 中，使其超过本次调用。
-栈上 native storage 无法安全支持这种逃逸。`RefWrap` 应在调用返回时检测临时
-`zend_reference` 是否出现额外持有者；检测到逃逸时抛出明确错误。该限制保证不会把
-已经失效的 C++ 地址暴露给 ZendVM。需要长期 PHP 引用身份的变量必须从一开始使用
-`std::any()`/`php::Ref`。
+栈上 native storage 无法安全支持这种逃逸。调用参数容器销毁后，`RefWrap` 应检查
+`zend_reference` 是否仍有额外持有者；检测到逃逸时抛出明确错误。该 reference 内只
+保存 native 值的副本，不保存 native 地址，因此不能形成悬空指针。需要长期 PHP 引用
+身份的变量必须从一开始使用 `std::any()`/`php::Ref`。
+
+`Args`、位置参数 Array 与 named-argument Array 也会暂时增加 reference 引用计数。
+成功路径必须先清理这些编译器自有容器，再执行 `commit()`/逃逸检查；异常展开按 C++
+逆序析构，自有参数容器同样必须先于较早构造的 `RefWrap` 释放。
 
 ## 局部引用约束
 
@@ -327,7 +332,8 @@ reference/type source；局部 `T&` 又不能安全逃出当前栈帧。因此 `
 
 1. **固定类型不变**：typed-ref 的目标在整个生命周期内始终是同一个 C++ 类型；
 2. **绑定不变**：一个 C++ reference 构造后永不重新绑定；
-3. **根唯一**：引用链被压缩到唯一 root，同一次调用中一个 root 只创建一个 bridge；
+3. **根唯一**：编译期已知的 typed-local 引用链被压缩到唯一 root，同一次调用中一个
+   已知 root 只创建一个 bridge；
 4. **只求值一次**：属性 receiver、数组 key、动态 callable 和每个参数表达式都不得重复求值；
 5. **PHP 求值顺序**：参数及嵌套调用按照 PHP 的从左到右可观察顺序完成；
 6. **调用级提交**：bridge 在本次调用完成后、下一个表达式开始前提交；
@@ -368,29 +374,72 @@ reference/type source；局部 `T&` 又不能安全逃出当前栈帧。因此 `
 
 ## 性能模型
 
-不能把正确性建立在“GCC 可能优化掉”之上。生成结构本身应让常见静态路径保持零成本，
-编译器优化只负责消除栈对象和内联 helper。
+性能要求只覆盖编译期可确定的 TypePHP 原生调用与 typed-ref。不能把正确性建立在
+“GCC 可能优化掉”之上：该主路径在生成结构上就必须没有装箱、Zend reference 和堆
+分配，编译器优化只负责消除 C++ 引用别名并内联函数。`var-ref`、动态函数/方法和
+Closure 调用继续沿用现有 Zend 动态分配路径，不为这些慢路径增加复杂缓存。
+
+例如下面的调用必须直接生成：
+
+```cpp
+php::Int value = 1;
+php::Int &alias = value;
+php_increment(alias); // void php_increment(php::Int &)
+```
+
+即使使用 `-O0`，它也只传递一个地址，不申请堆内存；在函数体可见或启用 LTO 时，
+GCC 通常会内联 `php_increment()` 并把 alias 完全消除。`php::Str&`、`php::Array&`
+同样只传现有 wrapper 的地址，不产生 zval copy 或引用计数操作。
 
 | 路径 | 额外堆分配 | 预期开销 |
 | --- | --- | --- |
 | typed local -> TypePHP typed-ref 参数 | 0 | 直接 `T&`，与普通 C++ 调用一致 |
 | typed-ref local/参数 -> TypePHP typed-ref 参数 | 0 | 直接转发相同 `T&` |
 | local typed alias | 0 | C++ reference，优化后通常不占独立存储 |
-| 已存在 Zend reference -> typed-ref | 0 | 栈上 wrapper/代理和引用计数操作 |
+| Zend reference -> typed-ref | 不设零分配目标 | 隔离代理及安全提交；String/Array 可触发正常 COW |
 | property/array item 首次变成 Zend reference | 通常 1 | Zend 建立 `zend_reference`，PHP 自身也需要 |
-| typed local -> 动态 Zend 引用调用 | 每个引用根通常 1 | 必须构造真实 `zend_reference`，明确慢路径 |
+| typed local -> 动态 Zend 引用调用 | 每次调用、每个引用根通常 1 | 继续使用真实 `zend_reference`，明确慢路径 |
 
-最后一项不能用栈上的伪造 `zend_reference` 替代。ZendVM、用户函数或扩展可能增加
+最后一项不能被 GCC 消除，也不能用栈上的伪造 `zend_reference` 替代。ZendVM、用户函数或扩展可能增加
 引用计数并暂存该 reference；把 refcounted 对象放在 C++ 栈上会产生释放非法地址或悬空
-引用。该分配只在用户显式 `std::ref($typedLocal)` 进入动态调用时发生，不得污染普通调用。
+引用。该分配只在用户显式 `std::ref($typedLocal)` 进入动态调用时发生，不得污染普通
+原生调用；动态路径不承诺零分配。
+
+### GCC 可优化边界
+
+函数体可见或启用 LTO 时，以下开销可由 GCC/Clang 在 `-O2/-O3` 下完整消除：
+
+- `T&` alias 本身；
+- 只捕获引用的立即执行 lambda；
+- 固定大小 `php::VarList/std::array` 的栈对象；
+- inline 的 `typed()`、无分支的静态调用转发；
+- 未取地址、未逃逸的小型代理对象。
+
+这些对象均不得被装入 `std::function`，也不得通过 `new`、`shared_ptr` 或动态容器保存；
+否则 lambda/类型擦除可能引入堆分配，GCC 也不能保证消除。
+
+下列开销具有 Zend 可观察语义，不能假定编译器会优化掉：
+
+- `ZVAL_NEW_REF`/`zend_reference` 分配与释放；
+- String/Array 写入触发的 COW；
+- zval 引用计数增减；
+- 动态调用、type source 和逃逸检查；
+- 异常实际发生时创建的 PHP/C++ 异常对象。
+
+因此“零成本”只承诺静态 typed-ref 主路径。动态桥接不要求退化成裸 C++ 引用，也不为
+减少其分配而牺牲现有 PHPX 封装。`try/catch` 和 lambda 只出现在确实需要桥接的路径；
+公共异常/逃逸处理应下沉到 out-of-line 冷函数，避免无谓扩大生成代码。
 
 ### 生成代码约束
 
-- `RefWrap` 是 header-only、非虚类，不使用 `std::function`、`std::vector` 或 type erasure；
-- wrapper、tuple/array 与立即执行 lambda 只使用栈存储；
-- 同一调用按引用根去重，避免重复建立 `zend_reference`；
+- `RefWrap` 是 header-only、非虚类，不使用 `std::function` 或 type erasure；
+- 静态 typed-ref 主路径只使用 C++ `T&`，不得创建 wrapper 或 Zend reference；
+- 动态/var-ref 路径可继续使用既有 `Args`、Zend reference 与动态内存分配，不为其性能
+  引入函数级缓存、跨调用复用或裸指针旁路；
+- 同一调用中可静态证明同根的 typed-local 实参按引用根去重并共享 reference 身份；
 - 成功主路径不创建错误消息或临时字符串，异常检查放入 `UNEXPECTED` 冷分支；
-- 不在循环或函数级缓存临时 Zend reference，避免引用身份错误和逃逸；
+- 调用参数容器销毁后立即 `commit()`，不跨调用缓存或延迟同步值；
+- 每次提交后验证没有逃逸；
 - 普通静态 typed-ref 调用不得生成方向判断、commit 或 refcount 操作；
 - `Bool` 代理只用于 Zend bridge，native `Bool& -> Bool&` 仍是直接调用。
 
@@ -400,15 +449,18 @@ reference/type source；局部 `T&` 又不能安全逃出当前栈帧。因此 `
 
 1. 对纯 native typed-ref micro benchmark 生成 `-O3 -S` 汇编，确认 wrapper 和 lambda
    不存在、调用可正常 inline；
-2. 统计静态调用循环的 `malloc/emalloc` 次数，必须为 0；
+2. 统计静态 typed-ref 调用循环的额外 `malloc/emalloc` 次数，必须为 0；动态
+   `std::ref()` 只记录基线，不设零分配目标；
 3. 分别 benchmark `Int/Float/Bool/Str/Array` 的直接调用、property/array bridge 和动态
    `std::ref()`；
 4. 比较 `-O0` 生成 C++ 的尺寸，避免每个调用点展开大段异常处理；公共慢路径放在 PHPX
    非模板 helper 中；
 5. 使用 ASan/Valgrind 验证异常、逃逸检测和多别名调用没有泄漏或悬空引用。
+6. 同时比较 `-O0` 与 `-O3`：正确性和分配上限不能依赖优化级别，`-O3` 只负责消除
+   栈上胶水；使用 `-fno-inline` 时也不得出现额外堆分配。
 
-目标不是让动态 Zend bridge 等同于直接 C++ 调用，而是保证零成本静态主路径，并把不可
-避免的装箱和堆分配限制在用户显式选择的动态边界。
+目标是保证零成本静态主路径。动态 Zend bridge 保持现有、安全、易维护的 PHPX 路径，
+不将它的性能问题扩大为 typed-ref 设计复杂度。
 
 ## 实施顺序
 

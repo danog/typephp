@@ -55,7 +55,7 @@ function main()
     var_dump($k);
 
     // Test 7: normal variable unset + ??
-    $m = 50;
+    $m = std::any(50);
     unset($m);
     var_dump($m ?? 777);
 

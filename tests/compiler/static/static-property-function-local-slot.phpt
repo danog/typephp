@@ -61,7 +61,7 @@ array(3) {
   [1]=>
   NULL
   [2]=>
-  &string(9) "reference"
+  string(9) "reference"
 }
 string(9) "reference"
 string(11) "child-write"

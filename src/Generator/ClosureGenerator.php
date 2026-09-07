@@ -175,6 +175,26 @@ trait ClosureGenerator
                     'By-reference variadic parameters are not supported on dynamic Closures',
                 );
             }
+            if ($param->byRef && $param->type !== null) {
+                [$paramType, $paramClass] = $this->resolveTypeDecl(
+                    $param->type,
+                    self::DECL_TYPE_OF_PARAM,
+                );
+                if ($paramClass !== '' || in_array($paramType, [
+                    Type::OBJECT,
+                    Type::STREAM,
+                    Type::BOX,
+                    Type::STD_ARRAY,
+                    Type::STD_VECTOR,
+                    Type::STD_MAP,
+                    Type::STD_ORDERED_MAP,
+                ], true)) {
+                    $this->fatalError(
+                        $param,
+                        'References are only supported for int, string, float, bool, array, mixed, or union types',
+                    );
+                }
+            }
         }
         $tmpVar = $this->genTmpVarName();
 

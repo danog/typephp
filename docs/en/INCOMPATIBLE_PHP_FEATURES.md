@@ -103,17 +103,25 @@ incompatible with or more restrictive than standard PHP.
   used explicitly.
 - `std::ref()` / `toRef()` only accept variables, array elements, or object
   properties.
-- A local with fixed storage (`Int`, `Float`, `Bool`, `Str`, `Array`, `Object`,
-  `Stream`, high-precision values, or a `std` container) cannot be made into a
-  PHP reference. An ordinary local reference has no Zend type source and could
-  replace such storage with an incompatible value. Objects, streams, typed
-  objects, and `std` containers already use handle/reference-like value
-  semantics, so adding a PHP reference to the local variable is unnecessary as
-  well. Typed object/static properties remain reference-capable because Zend
-  attaches their property metadata to the reference; PHP array elements remain
-  dynamic reference-capable slots. Initialize a local with `std::any()` when
-  PHP reference semantics are required, then convert it back explicitly with a
-  keyword such as `toArray()` or `toString()`.
+- Fixed `int`, `float`, `bool`, `string`, and `array` locals support a restricted
+  native-reference model. A one-time top-level binding such as `$alias =& $value`
+  becomes a C++ `T&`, and an exact `int/string/float/bool/array &$arg` on a
+  statically resolved TypePHP call also uses `T&` without boxing or allocating a
+  Zend reference. Rebinding, conditional/loop-local first binding, `unset`,
+  by-reference Closure capture, returning the local by reference, or storing the
+  reference in a property/array/global is rejected because the C++ reference may
+  not escape or change its target.
+- Dynamic calls and Closure calls still require explicit `std::ref()` / `toRef()`.
+  TypePHP creates a call-scoped Zend reference, validates its type on write-back,
+  and reports an error if dynamic code retains it beyond the call. Code requiring
+  unrestricted PHP reference identity should initialize the local with
+  `std::any()` and use the existing `php::Var`/`php::Ref` path.
+- Fixed object, resource/stream, high-precision, Native/typed-object, Box, and
+  `std`-container locals cannot be referenced. These values already have
+  handle/reference-like semantics, while rebinding their statically typed local
+  slot would weaken the type system. Typed object/static properties remain
+  reference-capable because Zend attaches property type sources; PHP array
+  elements remain dynamic reference-capable slots.
 - A call that uses argument unpacking followed by named arguments falls back to
   dynamic dispatch and cannot use the native call path.
 

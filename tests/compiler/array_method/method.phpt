@@ -140,33 +140,33 @@ function main()
     Assert::true($array->isEmpty());
 
     $fruits1 = array("lemon", "orange", "banana", "apple");
-    $fruits2 = std::any(array("lemon", "orange", "banana", "apple"));
+    $fruits2 = array("lemon", "orange", "banana", "apple");
     sort($fruits2);
     Assert::eq($fruits1->sort(), $fruits2);
     Assert::eq($fruits1, $fruits2);
 
-    $stack = std::any(array("orange", "banana", "apple", "raspberry"));
+    $stack = array("orange", "banana", "apple", "raspberry");
     Assert::eq($stack->pop(), 'raspberry');
     Assert::eq(array_pop($stack), 'apple');
 
-    $mutableArray = std::any(array("red","green"));
+    $mutableArray = array("red","green");
     $mutableArray->push("blue");
     Assert::eq($mutableArray, ["red","green", "blue"]);
     array_push($mutableArray, "yellow");
     Assert::eq($mutableArray, ["red","green", "blue", "yellow"]);
 
-    $stack = std::any(array("orange", "banana", "apple", "raspberry"));
+    $stack = array("orange", "banana", "apple", "raspberry");
     Assert::eq($stack->shift(), 'orange');
     Assert::eq(array_shift($stack), 'banana');
 
-    $queue = std::any(["orange", "banana"]);
+    $queue = ["orange", "banana"];
     $queue->unshift("orange");
     Assert::eq($queue, ["orange", "orange", "banana"]);
     array_unshift($queue, "orange");
     Assert::eq($queue, ["orange", "orange", "orange", "banana"]);
 
     $array1 = array("red", "green", "blue", "yellow");
-    $spliceArray = std::any(array("red", "green", "blue", "yellow"));
+    $spliceArray = array("red", "green", "blue", "yellow");
     Assert::eq($array1->splice(2), array_splice($spliceArray, 2));
     Assert::eq($array1, $spliceArray);
 

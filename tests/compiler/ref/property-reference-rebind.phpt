@@ -12,7 +12,7 @@ final class PrivatePropertyReferenceHolder
 {
     private ?array $value = null;
 
-    public function bind(array &$source): void
+    public function bind(mixed &$source): void
     {
         $this->value = &$source;
     }

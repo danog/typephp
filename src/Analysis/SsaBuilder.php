@@ -372,7 +372,7 @@ class SsaBuilder
      * @param SsaBlock[] $blocks  Reference to the blocks array being built
      * @param SsaBlock  $currentBlock  The current block (already in $blocks)
      */
-    private function splitStmtList(array $stmts, array &$blocks, SsaBlock &$currentBlock): void
+    private function splitStmtList(array $stmts, array &$blocks, SsaBlock $currentBlock): SsaBlock
     {
         for ($i = 0; $i < count($stmts); $i++) {
             $stmt = $stmts[$i];
@@ -414,7 +414,7 @@ class SsaBuilder
 
             // If statement: expand into condition block + body blocks + join
             if ($stmt instanceof Stmt\If_) {
-                $this->expandIfStmt($stmt, $blocks, $currentBlock, $i, $stmts);
+                $currentBlock = $this->expandIfStmt($stmt, $blocks, $currentBlock, $i, $stmts);
                 continue;
             }
 
@@ -431,6 +431,8 @@ class SsaBuilder
             // Regular statement: add to current block
             $currentBlock->stmts[] = $stmt;
         }
+
+        return $currentBlock;
     }
 
     /**
@@ -444,7 +446,7 @@ class SsaBuilder
      *
      * @param SsaBlock[] $blocks
      */
-    private function expandIfStmt(Stmt\If_ $ifStmt, array &$blocks, SsaBlock &$currentBlock, int $stmtIndex, array $allStmts): void
+    private function expandIfStmt(Stmt\If_ $ifStmt, array &$blocks, SsaBlock $currentBlock, int $stmtIndex, array $allStmts): SsaBlock
     {
         // The if statement is the last statement in the current (condition) block
         $currentBlock->stmts[] = $ifStmt;
@@ -473,7 +475,7 @@ class SsaBuilder
                     $currentBlock = $this->newBlock();
                     $blocks[] = $currentBlock;
                 }
-                $this->expandIfStmt($innerIf, $blocks, $currentBlock, 0, [$innerIf]);
+                $currentBlock = $this->expandIfStmt($innerIf, $blocks, $currentBlock, 0, [$innerIf]);
             }
         }
         if ($ifStmt->else) {
@@ -514,6 +516,8 @@ class SsaBuilder
         if ($stmtIndex < count($allStmts) - 1) {
             $currentBlock = $joinBlock;
         }
+
+        return $currentBlock;
     }
 
     /**

@@ -1,13 +1,12 @@
 <?php
 /**
- * This file is part of TypePHP.
+ * This file is part of TypePHP(AOT).
  *
- * Call argument lowering shared by native and dynamic call paths.
+ * @link     https://www.swoole.com/aot/
+ * @contact  service@swoole.com
  */
 
 namespace TypePhp\Generator;
-
-use TypePhp\Type;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr;
@@ -16,7 +15,7 @@ use TypePhp\Entity\ArgInfo;
 use TypePhp\Entity\FunctionDef;
 use TypePhp\Exception\PlaceHolder;
 use TypePhp\Resolver\Reflection;
-use TypePhp\Generator\Symbol;
+use TypePhp\Type;
 
 trait CallArgumentGenerator
 {
@@ -28,203 +27,207 @@ trait CallArgumentGenerator
         string $nativeFunc,
         int $parameterOffset = 0,
         bool $deferTrailingDefaults = false,
-    ): string
-    {
+    ): string {
         $this->assertCallArgumentLimit($callArgs);
-        $functionDef = $this->getFunction($nativeFunc);
-        $providedArgs = [];
-        $defaultArgs = [];
-        $sourceArgs = [];
-        $variadicArgCount = 0;
-        $hasNamedArg = false;
-        $argNameIndex = $this->getFunctionArgNameIndex($functionDef);
-        $variadicArgIndex = $this->getVariadicArgIndex($functionDef);
-        // Reorder the named arguments into their declared positions
-        foreach ($callArgs as $i => $arg) {
-            if ($this->isPlaceholderExpr($arg)) {
-                throw new PlaceHolder();
-            }
-            if ($arg->name) {
-                $argName = $arg->name->name;
-                $k = $argNameIndex[$argName] ?? null;
-                if ($k !== null and ($variadicArgIndex === null or $k < $variadicArgIndex)) {
-                    if ($k < $parameterOffset) {
-                        $this->fatalError($arg, 'Named argument cannot target the extension receiver');
+        $this->context->typedRefBridgeScopes[] = [];
+        try {
+            $functionDef = $this->getFunction($nativeFunc);
+            $providedArgs = [];
+            $defaultArgs = [];
+            $sourceArgs = [];
+            $variadicArgCount = 0;
+            $hasNamedArg = false;
+            $argNameIndex = $this->getFunctionArgNameIndex($functionDef);
+            $variadicArgIndex = $this->getVariadicArgIndex($functionDef);
+            // Reorder the named arguments into their declared positions
+            foreach ($callArgs as $i => $arg) {
+                if ($this->isPlaceholderExpr($arg)) {
+                    throw new PlaceHolder();
+                }
+                if ($arg->name) {
+                    $argName = $arg->name->name;
+                    $k = $argNameIndex[$argName] ?? null;
+                    if ($k !== null and ($variadicArgIndex === null or $k < $variadicArgIndex)) {
+                        if ($k < $parameterOffset) {
+                            $this->fatalError($arg, 'Named argument cannot target the extension receiver');
+                        }
+                        $providedArgs[$k] = true;
+                        $sourceArgs[] = [$k, null, $arg];
+                    } else {
+                        if ($variadicArgIndex === null) {
+                            $this->fatalError($arg, "Unknown named argument `{$argName}`");
+                        }
+                        $sourceArgs[] = [$variadicArgIndex, $argName, $arg];
+                        $variadicArgCount++;
                     }
-                    $providedArgs[$k] = true;
-                    $sourceArgs[] = [$k, null, $arg];
-                } else {
-                    if ($variadicArgIndex === null) {
-                        $this->fatalError($arg, "Unknown named argument `{$argName}`");
-                    }
-                    $sourceArgs[] = [$variadicArgIndex, $argName, $arg];
+                    $hasNamedArg = true;
+                } elseif ($variadicArgIndex !== null and $i + $parameterOffset >= $variadicArgIndex) {
+                    $sourceArgs[] = [$variadicArgIndex, null, $arg];
                     $variadicArgCount++;
+                } else {
+                    $argIndex = $i + $parameterOffset;
+                    $providedArgs[$argIndex] = true;
+                    $sourceArgs[] = [$argIndex, null, $arg];
                 }
-                $hasNamedArg = true;
-            } elseif ($variadicArgIndex !== null and $i + $parameterOffset >= $variadicArgIndex) {
-                $sourceArgs[] = [$variadicArgIndex, null, $arg];
-                $variadicArgCount++;
-            } else {
-                $argIndex = $i + $parameterOffset;
-                $providedArgs[$argIndex] = true;
-                $sourceArgs[] = [$argIndex, null, $arg];
             }
-        }
-        // Fill ABI holes first, but do not sort yet. User expressions must be
-        // lowered in source order; sorting raw AST arguments here would also
-        // reorder their side effects.
-        if ($hasNamedArg) {
-            $lastProvidedIndex = $providedArgs === []
-                ? $parameterOffset - 1
-                : max(array_keys($providedArgs));
-            if ($deferTrailingDefaults && $variadicArgCount > 0) {
-                $lastProvidedIndex = $variadicArgIndex;
-            }
-            // Holes left between named arguments must be filled with default arguments
-            foreach ($functionDef->argInfoList as $k => $argInfo) {
-                if ($k < $parameterOffset) {
-                    continue;
+            // Fill ABI holes first, but do not sort yet. User expressions must be
+            // lowered in source order; sorting raw AST arguments here would also
+            // reorder their side effects.
+            if ($hasNamedArg) {
+                $lastProvidedIndex = $providedArgs === []
+                    ? $parameterOffset - 1
+                    : max(array_keys($providedArgs));
+                if ($deferTrailingDefaults && $variadicArgCount > 0) {
+                    $lastProvidedIndex = $variadicArgIndex;
                 }
-                if ($variadicArgIndex !== null and $k === $variadicArgIndex) {
-                    continue;
-                }
-                if (!isset($providedArgs[$k])) {
-                    // A Native virtual overload must omit a trailing default
-                    // so the dynamically selected implementation supplies it.
-                    // A named-argument hole before a later argument cannot be
-                    // represented by a positional C++ overload without a
-                    // presence mask, so reject that uncommon shape explicitly.
-                    if ($deferTrailingDefaults && $k > $lastProvidedIndex) {
+                // Holes left between named arguments must be filled with default arguments
+                foreach ($functionDef->argInfoList as $k => $argInfo) {
+                    if ($k < $parameterOffset) {
                         continue;
                     }
-                    if ($deferTrailingDefaults) {
-                        $this->fatalError(
-                            reset($callArgs),
-                            'Named calls to Native virtual methods cannot skip an earlier optional parameter',
-                        );
+                    if ($variadicArgIndex !== null and $k === $variadicArgIndex) {
+                        continue;
                     }
-                    if (!$argInfo->hasDefaultValue()) {
-                        $errorNode = null;
-                        foreach ($callArgs as $a) {
-                            if ($a instanceof Node\Arg && $a->name) {
-                                $errorNode = $a;
-                                break;
-                            }
+                    if (!isset($providedArgs[$k])) {
+                        // A Native virtual overload must omit a trailing default
+                        // so the dynamically selected implementation supplies it.
+                        // A named-argument hole before a later argument cannot be
+                        // represented by a positional C++ overload without a
+                        // presence mask, so reject that uncommon shape explicitly.
+                        if ($deferTrailingDefaults && $k > $lastProvidedIndex) {
+                            continue;
                         }
-                        $argName = $argInfo->phpName ?: $this->unescapeVarName($argInfo->name);
-                        $this->fatalError($errorNode ?? reset($callArgs), 'Named argument `' . $argName . '` is missing default value');
+                        if ($deferTrailingDefaults) {
+                            $this->fatalError(
+                                reset($callArgs),
+                                'Named calls to Native virtual methods cannot skip an earlier optional parameter',
+                            );
+                        }
+                        if (!$argInfo->hasDefaultValue()) {
+                            $errorNode = null;
+                            foreach ($callArgs as $a) {
+                                if ($a instanceof Node\Arg && $a->name) {
+                                    $errorNode = $a;
+                                    break;
+                                }
+                            }
+                            $argName = $argInfo->phpName ?: $this->unescapeVarName($argInfo->name);
+                            $this->fatalError($errorNode ?? reset($callArgs), 'Named argument `' . $argName . '` is missing default value');
+                        }
+                        // Defaults are resolved in the declaration scope. Re-parsing
+                        // the original AST here would evaluate self/parent/private
+                        // class constants in the caller's scope instead.
+                        $defaultArgs[$k] = $this->genDefaultArgumentExpr($nativeFunc, $k);
                     }
-                    // Defaults are resolved in the declaration scope. Re-parsing
-                    // the original AST here would evaluate self/parent/private
-                    // class constants in the caller's scope instead.
-                    $defaultArgs[$k] = $this->genDefaultArgumentExpr($nativeFunc, $k);
                 }
             }
-        }
 
-        // If the function only accepts a single variadic parameter and the call
-        // supplies no arguments, pass an empty array directly
-        if (count($sourceArgs) === 0
-            and count($functionDef->argInfoList) === $parameterOffset + 1
-            and $functionDef->argInfoList[$parameterOffset]->variadic) {
-            return $deferTrailingDefaults ? '' : '{}';
-        }
-
-        $resolvedArgs = [];
-        $variadicVar = null;
-        $callableName = $functionDef->displayName ?: $functionDef->getNamespacedName();
-
-        // PHP evaluates arguments left to right. A later argument that hoists
-        // captured statements while being lowered (an assignment, a call)
-        // would execute those side effects before an earlier plain-variable
-        // argument is read: `two($j, $j = 5)` must pass the old value of $j.
-        // Record the last such argument so every earlier by-value variable
-        // read can be snapshotted at its own argument position.
-        $lastHoistingSourceIndex = -1;
-        foreach ($sourceArgs as $sourceIndex => [, , $arg]) {
-            if ($arg instanceof Node\Arg && $this->shouldMaterializeOrderedOperand($arg->value)) {
-                $lastHoistingSourceIndex = $sourceIndex;
+            // If the function only accepts a single variadic parameter and the call
+            // supplies no arguments, pass an empty array directly
+            if (count($sourceArgs) === 0
+                and count($functionDef->argInfoList) === $parameterOffset + 1
+                and $functionDef->argInfoList[$parameterOffset]->variadic) {
+                return $deferTrailingDefaults ? '' : '{}';
             }
-        }
 
-        // Evaluate every supplied argument in PHP source order. The resulting
-        // expressions/temporaries may then be rearranged safely for the native
-        // C++ ABI without changing observable call order.
-        foreach ($sourceArgs as $sourceIndex => [$sourceArgIndex, $variadicName, $arg]) {
-            if ($sourceIndex < $lastHoistingSourceIndex
-                && $arg instanceof Node\Arg
-                && !$arg->unpack
-                && $this->isSnapshotableVariableRead($arg->value)
-            ) {
-                $paramInfo = $sourceArgIndex === $variadicArgIndex
-                    ? $functionDef->argInfoList[$variadicArgIndex]
-                    : $this->getArgInfo($arg, $nativeFunc, $sourceArgIndex);
-                if ($paramInfo !== null && !$paramInfo->byRef) {
-                    $snapshot = $this->parseOrderedOperand($arg->value, false, true);
-                    $arg = clone $arg;
-                    $arg->value = new Expr\Variable($snapshot, $arg->value->getAttributes());
+            $resolvedArgs = [];
+            $variadicVar = null;
+            $callableName = $functionDef->displayName ?: $functionDef->getNamespacedName();
+
+            // PHP evaluates arguments left to right. A later argument that hoists
+            // captured statements while being lowered (an assignment, a call)
+            // would execute those side effects before an earlier plain-variable
+            // argument is read: `two($j, $j = 5)` must pass the old value of $j.
+            // Record the last such argument so every earlier by-value variable
+            // read can be snapshotted at its own argument position.
+            $lastHoistingSourceIndex = -1;
+            foreach ($sourceArgs as $sourceIndex => [, , $arg]) {
+                if ($arg instanceof Node\Arg && $this->shouldMaterializeOrderedOperand($arg->value)) {
+                    $lastHoistingSourceIndex = $sourceIndex;
                 }
             }
-            if ($sourceArgIndex !== $variadicArgIndex) {
-                $argInfo = $this->getArgInfo($arg, $nativeFunc, $sourceArgIndex);
-                $resolvedArgs[$sourceArgIndex] = $this->getTypeConvertedArg(
-                    $arg,
-                    $argInfo,
-                    $callableName,
-                    $sourceArgIndex
-                );
-                continue;
-            }
 
-            $argInfo = $functionDef->argInfoList[$variadicArgIndex];
-            // A single unpacked by-value native array is already the ABI
-            // value. A by-reference variadic must still separate the source
-            // and turn every element into a reference before entering the
-            // callee, matching Zend's argument-unpacking semantics.
-            if (!$argInfo->byRef && $variadicArgCount === 1 && $arg->unpack && $this->isVarExpr($arg->value)) {
-                $var = $this->parseIdentifier($arg->value);
-                if ($this->getVarType($var) === Type::ARRAY) {
-                    $resolvedArgs[$variadicArgIndex] = $var;
+            // Evaluate every supplied argument in PHP source order. The resulting
+            // expressions/temporaries may then be rearranged safely for the native
+            // C++ ABI without changing observable call order.
+            foreach ($sourceArgs as $sourceIndex => [$sourceArgIndex, $variadicName, $arg]) {
+                if ($sourceIndex < $lastHoistingSourceIndex
+                    && $arg instanceof Node\Arg
+                    && !$arg->unpack
+                    && $this->isSnapshotableVariableRead($arg->value)
+                ) {
+                    $paramInfo = $sourceArgIndex === $variadicArgIndex
+                        ? $functionDef->argInfoList[$variadicArgIndex]
+                        : $this->getArgInfo($arg, $nativeFunc, $sourceArgIndex);
+                    if ($paramInfo !== null && !$paramInfo->byRef) {
+                        $snapshot = $this->parseOrderedOperand($arg->value, false, true);
+                        $arg = clone $arg;
+                        $arg->value = new Expr\Variable($snapshot, $arg->value->getAttributes());
+                    }
+                }
+                if ($sourceArgIndex !== $variadicArgIndex) {
+                    $argInfo = $this->getArgInfo($arg, $nativeFunc, $sourceArgIndex);
+                    $resolvedArgs[$sourceArgIndex] = $this->getTypeConvertedArg(
+                        $arg,
+                        $argInfo,
+                        $callableName,
+                        $sourceArgIndex
+                    );
                     continue;
                 }
+
+                $argInfo = $functionDef->argInfoList[$variadicArgIndex];
+                // A single unpacked by-value native array is already the ABI
+                // value. A by-reference variadic must still separate the source
+                // and turn every element into a reference before entering the
+                // callee, matching Zend's argument-unpacking semantics.
+                if (!$argInfo->byRef && $variadicArgCount === 1 && $arg->unpack && $this->isVarExpr($arg->value)) {
+                    $var = $this->parseIdentifier($arg->value);
+                    if ($this->getVarType($var) === Type::ARRAY) {
+                        $resolvedArgs[$variadicArgIndex] = $var;
+                        continue;
+                    }
+                }
+
+                $variadicVar ??= $this->addTmpVar(Type::ARRAY);
+                if ($arg->unpack) {
+                    $method = $argInfo->byRef ? 'mergeReferences' : 'merge';
+                    $this->context->beforeStmtLines[] = $variadicVar . '.' . $method
+                        . '(' . $this->parseArrayArg($arg) . ');';
+                } elseif ($variadicName !== null) {
+                    $value = $this->getTypeConvertedArg($arg, $argInfo, $callableName, $variadicArgIndex);
+                    $method = $argInfo->byRef ? 'set' : 'setValue';
+                    $this->context->beforeStmtLines[] = $variadicVar . '.' . $method . '('
+                        . $this->getLiteralString($variadicName) . ', ' . $value . ');';
+                } else {
+                    $value = $this->getTypeConvertedArg($arg, $argInfo, $callableName, $variadicArgIndex);
+                    $method = $argInfo->byRef ? 'append' : 'appendValue';
+                    $this->context->beforeStmtLines[] = $variadicVar . '.' . $method . '(' . $value . ');';
+                }
             }
 
-            $variadicVar ??= $this->addTmpVar(Type::ARRAY);
-            if ($arg->unpack) {
-                $method = $argInfo->byRef ? 'mergeReferences' : 'merge';
-                $this->context->beforeStmtLines[] = $variadicVar . '.' . $method
-                    . '(' . $this->parseArrayArg($arg) . ');';
-            } elseif ($variadicName !== null) {
-                $value = $this->getTypeConvertedArg($arg, $argInfo, $callableName, $variadicArgIndex);
-                $method = $argInfo->byRef ? 'set' : 'setValue';
-                $this->context->beforeStmtLines[] = $variadicVar . '.' . $method . '('
-                    . $this->getLiteralString($variadicName) . ', ' . $value . ');';
-            } else {
-                $value = $this->getTypeConvertedArg($arg, $argInfo, $callableName, $variadicArgIndex);
-                $method = $argInfo->byRef ? 'append' : 'appendValue';
-                $this->context->beforeStmtLines[] = $variadicVar . '.' . $method . '(' . $value . ');';
+            // Defaults have no caller-side evaluation. Add them after user
+            // arguments, then sort only the already-lowered values for the ABI.
+            foreach ($defaultArgs as $i => $defaultArg) {
+                $resolvedArgs[$i] = $defaultArg;
             }
-        }
-
-        // Defaults have no caller-side evaluation. Add them after user
-        // arguments, then sort only the already-lowered values for the ABI.
-        foreach ($defaultArgs as $i => $defaultArg) {
-            $resolvedArgs[$i] = $defaultArg;
-        }
-        if ($variadicVar !== null) {
-            $resolvedArgs[$variadicArgIndex] = $variadicVar;
-            if ($functionDef->argInfoList[$variadicArgIndex]->byRef) {
-                // The aggregation array owns the second reference to every
-                // caller slot. Release it after the full PHP statement and
-                // also during C++ exception unwinding into a PHP catch block.
-                $cleanupGuard = $this->genTmpVarName();
-                $this->context->beforeStmtLines[] = 'php::ArrayCleanupGuard ' . $cleanupGuard
-                    . '{' . $variadicVar . '};';
-                $this->context->afterStmtLines[] = $cleanupGuard . '.cleanup();';
+            if ($variadicVar !== null) {
+                $resolvedArgs[$variadicArgIndex] = $variadicVar;
+                if ($functionDef->argInfoList[$variadicArgIndex]->byRef) {
+                    // The aggregation array owns the second reference to every
+                    // caller slot. Release it after the full PHP statement and
+                    // also during C++ exception unwinding into a PHP catch block.
+                    $cleanupGuard = $this->genTmpVarName();
+                    $this->context->beforeStmtLines[] = 'php::ArrayCleanupGuard ' . $cleanupGuard
+                        . '{' . $variadicVar . '};';
+                    $this->context->afterStmtLines[] = $cleanupGuard . '.cleanup();';
+                }
             }
+            ksort($resolvedArgs);
+            return implode(', ', $resolvedArgs);
+        } finally {
+            array_pop($this->context->typedRefBridgeScopes);
         }
-        ksort($resolvedArgs);
-        return implode(', ', $resolvedArgs);
     }
 
     protected function isReferenceArgument($funcName, $className, $argIndex): bool
@@ -415,183 +418,216 @@ trait CallArgumentGenerator
         string $className = '',
         bool $separateNamedArgs = true,
         bool $forceArrayArgs = false,
-        bool $preserveExistingReferences = false
-    ): string
-    {
+        bool $preserveExistingReferences = false,
+    ): string {
         $this->assertCallArgumentLimit($args);
-        $list_args = [];
-        $arrayArgsVar = null;
-        $argsVar = null;
-        $namedArgsVar = null;
-        $namedArgs = [];
-        $hasNamedArg = false;
-        $hasUnpack = false;
+        // Nested calls need independent bridge identities and commit points.
+        // Within one call, typed aliases that share a canonical native root
+        // must reuse one RefWrap so Zend observes one reference identity.
+        $this->context->typedRefBridgeScopes[] = [];
+        $afterStmtStart = count($this->context->afterStmtLines);
+        try {
+            $list_args = [];
+            $arrayArgsVar = null;
+            $argsVar = null;
+            $namedArgsVar = null;
+            $namedArgs = [];
+            $hasNamedArg = false;
+            $hasUnpack = false;
+            $lastHoistingArgIndex = -1;
 
-        if ($forceArrayArgs) {
-            $this->ensureCallArrayArgs($arrayArgsVar, $list_args);
-        }
-
-        foreach ($args as $i => $arg) {
-            if ($this->isPlaceholderExpr($arg)) {
-                throw new PlaceHolder();
-            }
-            if ($arg->unpack) {
-                if ($hasNamedArg) {
-                    $this->fatalError($arg, 'Cannot use argument unpacking after named arguments');
+            foreach ($args as $argIndex => $sourceArg) {
+                if ($sourceArg instanceof Node\Arg
+                    && !$sourceArg->unpack
+                    && $this->shouldMaterializeOrderedOperand($sourceArg->value)
+                ) {
+                    $lastHoistingArgIndex = $argIndex;
                 }
-                $hasUnpack = true;
-                if (!$forceArrayArgs && $separateNamedArgs) {
-                    $callArgs = $this->ensureCallArgs($argsVar, $list_args);
-                    $this->context->beforeStmtLines[] = $callArgs . '.appendUnpacked(' . $this->parseArrayArg($arg) . ');';
-                    if ($arg->getAttribute(self::ATTR_SCOPED_CALLBACK) === 'normalize-unpacked') {
-                        $this->context->beforeStmtLines[] = 'php::normalizeCallableClass('
-                            . $callArgs . ', 0, ' . $this->getCallableScopeExpr() . ');';
+            }
+
+            if ($forceArrayArgs) {
+                $this->ensureCallArrayArgs($arrayArgsVar, $list_args);
+            }
+
+            foreach ($args as $i => $arg) {
+                if ($this->isPlaceholderExpr($arg)) {
+                    throw new PlaceHolder();
+                }
+                if ($arg->unpack) {
+                    if ($hasNamedArg) {
+                        $this->fatalError($arg, 'Cannot use argument unpacking after named arguments');
                     }
-                } else {
-                    $arrayArgs = $this->ensureCallArrayArgs($arrayArgsVar, $list_args);
-                    $this->context->beforeStmtLines[] = $arrayArgs . '.merge(' . $this->parseArrayArg($arg) . ');';
+                    $hasUnpack = true;
+                    if (!$forceArrayArgs && $separateNamedArgs) {
+                        $callArgs = $this->ensureCallArgs($argsVar, $list_args);
+                        $this->context->beforeStmtLines[] = $callArgs . '.appendUnpacked(' . $this->parseArrayArg($arg) . ');';
+                        if ($arg->getAttribute(self::ATTR_SCOPED_CALLBACK) === 'normalize-unpacked') {
+                            $this->context->beforeStmtLines[] = 'php::normalizeCallableClass('
+                                . $callArgs . ', 0, ' . $this->getCallableScopeExpr() . ');';
+                        }
+                    } else {
+                        $arrayArgs = $this->ensureCallArrayArgs($arrayArgsVar, $list_args);
+                        $this->context->beforeStmtLines[] = $arrayArgs . '.merge(' . $this->parseArrayArg($arg) . ');';
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if ($arg->name !== null) {
-                $hasNamedArg = true;
-                if (!$this->isIdExpr($arg->name)) {
-                    $this->fatalError($arg, 'Named argument must be a string');
+                if ($arg->name !== null) {
+                    $hasNamedArg = true;
+                    if (!$this->isIdExpr($arg->name)) {
+                        $this->fatalError($arg, 'Named argument must be a string');
+                    }
+                    if (array_key_exists($arg->name->name, $namedArgs)) {
+                        $this->fatalError($arg, "Duplicate named argument `{$arg->name->name}`");
+                    }
+                    $namedArgs[$arg->name->name] = true;
+                    $byRef = ($funcName && $this->isReferenceNamedArgument($funcName, $className, $arg->name->name))
+                        || ($preserveExistingReferences && $this->isExistingReferenceCallArg($arg));
+                    if ($byRef) {
+                        $this->assertReadonlyPropertyReferenceForbidden($arg->value, $arg, false);
+                    }
+                    $value = ($byRef || $this->isStdRefCall($arg->value) || $this->isToRefCall($arg->value))
+                        ? $this->parseReferenceCallArgValue($arg)
+                        : $this->parseOrderedDynamicCallArgValue($arg, $i, $lastHoistingArgIndex);
+                    $value = $this->wrapScopedCallbackArg($arg, $value);
+                    if ($separateNamedArgs) {
+                        $namedArgsArray = $this->ensureCallNamedArgs($namedArgsVar);
+                        $this->context->beforeStmtLines[] = $namedArgsArray . '.set(' . $this->getLiteralString($arg->name->name) . ', ' . $value . ');';
+                    } else {
+                        $arrayArgs = $this->ensureCallArrayArgs($arrayArgsVar, $list_args);
+                        $method = $forceArrayArgs ? 'setValue' : 'set';
+                        $this->context->beforeStmtLines[] = $arrayArgs . '.' . $method . '('
+                            . $this->getLiteralString($arg->name->name) . ', ' . $value . ');';
+                    }
+                    continue;
                 }
-                if (array_key_exists($arg->name->name, $namedArgs)) {
-                    $this->fatalError($arg, "Duplicate named argument `{$arg->name->name}`");
+                if ($hasNamedArg) {
+                    $this->fatalError($arg, 'Cannot use positional argument after named argument');
                 }
-                $namedArgs[$arg->name->name] = true;
-                $byRef = ($funcName && $this->isReferenceNamedArgument($funcName, $className, $arg->name->name))
+                if ($hasUnpack) {
+                    $this->fatalError($arg, 'Cannot use positional argument after argument unpacking');
+                }
+                $byRef = ($funcName && $this->isReferenceArgument($funcName, $className, $i))
                     || ($preserveExistingReferences && $this->isExistingReferenceCallArg($arg));
                 if ($byRef) {
                     $this->assertReadonlyPropertyReferenceForbidden($arg->value, $arg, false);
                 }
-                $value = ($byRef || $this->isStdRefCall($arg->value) || $this->isToRefCall($arg->value))
-                    ? $this->parseReferenceCallArgValue($arg)
-                    : $this->parseCallArgValue($arg);
-                $value = $this->wrapScopedCallbackArg($arg, $value);
-                if ($separateNamedArgs) {
-                    $namedArgsArray = $this->ensureCallNamedArgs($namedArgsVar);
-                    $this->context->beforeStmtLines[] = $namedArgsArray . '.set(' . $this->getLiteralString($arg->name->name) . ', ' . $value . ');';
-                } else {
-                    $arrayArgs = $this->ensureCallArrayArgs($arrayArgsVar, $list_args);
-                    $method = $forceArrayArgs ? 'setValue' : 'set';
-                    $this->context->beforeStmtLines[] = $arrayArgs . '.' . $method . '('
-                        . $this->getLiteralString($arg->name->name) . ', ' . $value . ');';
+                $scopedCallback = $arg->getAttribute(self::ATTR_SCOPED_CALLBACK);
+                if ($scopedCallback !== null) {
+                    if ($this->isVarExpr($arg->value)) {
+                        $name = $this->parseIdentifier($arg->value);
+                        if (!$this->hasVar($name)) {
+                            $this->fatalError($arg, 'Undefined variable `$' . $name . '`');
+                        }
+                    }
+                    $value = $this->wrapScopedCallbackArg(
+                        $arg,
+                        $this->parseOrderedDynamicCallArgValue($arg, $i, $lastHoistingArgIndex),
+                    );
+                    $this->addPositionalCallArg($value, $arrayArgsVar, $list_args, $forceArrayArgs);
+                    continue;
                 }
-                continue;
-            }
-            if ($hasNamedArg) {
-                $this->fatalError($arg, 'Cannot use positional argument after named argument');
-            }
-            if ($hasUnpack) {
-                $this->fatalError($arg, 'Cannot use positional argument after argument unpacking');
-            }
-            $byRef = ($funcName && $this->isReferenceArgument($funcName, $className, $i))
-                || ($preserveExistingReferences && $this->isExistingReferenceCallArg($arg));
-            if ($byRef) {
-                $this->assertReadonlyPropertyReferenceForbidden($arg->value, $arg, false);
-            }
-            $scopedCallback = $arg->getAttribute(self::ATTR_SCOPED_CALLBACK);
-            if ($scopedCallback !== null) {
                 if ($this->isVarExpr($arg->value)) {
                     $name = $this->parseIdentifier($arg->value);
+                    if ($byRef) {
+                        $this->addPositionalCallArg($this->parseArgRefVar($arg, $name), $arrayArgsVar, $list_args, $forceArrayArgs);
+                        continue;
+                    }
                     if (!$this->hasVar($name)) {
                         $this->fatalError($arg, 'Undefined variable `$' . $name . '`');
                     }
-                }
-                $value = $this->wrapScopedCallbackArg($arg, $this->parseCallArgValue($arg));
-                $this->addPositionalCallArg($value, $arrayArgsVar, $list_args, $forceArrayArgs);
-                continue;
-            }
-            if ($this->isVarExpr($arg->value)) {
-                $name = $this->parseIdentifier($arg->value);
-                if ($byRef) {
-                    $this->addPositionalCallArg($this->parseArgRefVar($arg, $name), $arrayArgsVar, $list_args, $forceArrayArgs);
-                    continue;
-                }
-                if (!$this->hasVar($name)) {
-                    $this->fatalError($arg, 'Undefined variable `$' . $name . '`');
-                }
-            } elseif ($this->isPropertyFetch($arg->value)) {
-                if ($byRef) {
-                    $this->addPositionalCallArg($this->emitDynamicPropertyFetchRef($arg->value, $arg), $arrayArgsVar, $list_args, $forceArrayArgs);
-                    continue;
-                }
-                if ($this->isVarExpr($arg->value->var)) {
-                    $objectExpr = $this->parseIdentifier($arg->value->var);
-                    if (!$this->hasVar($objectExpr)) {
-                        $this->fatalError($arg, 'Undefined variable `$' . $objectExpr . '`');
-                    }
-                }
-            } elseif ($this->isArrayDimFetch($arg->value) and $this->isVarExpr($arg->value->var)) {
-                $array = $this->parseIdentifier($arg->value->var);
-                if ($array === 'GLOBALS') {
-                    $globalVar = $this->parseGlobalsArrayDimFetch($arg->value);
-                    // Global variable passed as a by-reference argument
+                } elseif ($this->isPropertyFetch($arg->value)) {
                     if ($byRef) {
-                        $ref = $this->addTmpVar(Type::REF);
-                        $this->context->beforeStmtLines[] = $ref . ' = ' . $globalVar . '.toReference();';
-                        $this->addPositionalCallArg('&' . $ref, $arrayArgsVar, $list_args, $forceArrayArgs);
-                    } else {
-                        $this->addPositionalCallArg($globalVar, $arrayArgsVar, $list_args, $forceArrayArgs);
+                        $this->addPositionalCallArg($this->emitDynamicPropertyFetchRef($arg->value, $arg), $arrayArgsVar, $list_args, $forceArrayArgs);
+                        continue;
                     }
-                    continue;
-                }
-                if ($this->isVarExpr($arg->value->var) and !$this->hasVar($array)) {
-                    $this->fatalError($arg, 'Undefined variable `$' . $array . '`');
-                }
-                if ($byRef) {
-                    if ($arg->value->dim === null) {
-                        $this->fatalError($arg, 'Array dimension must be a constant expression');
+                    if ($this->isVarExpr($arg->value->var)) {
+                        $objectExpr = $this->parseIdentifier($arg->value->var);
+                        if (!$this->hasVar($objectExpr)) {
+                            $this->fatalError($arg, 'Undefined variable `$' . $objectExpr . '`');
+                        }
                     }
-                    $this->addPositionalCallArg($array . '.itemRef(' . $this->identifierToStr($arg->value->dim) . ')', $arrayArgsVar, $list_args, $forceArrayArgs);
-                    continue;
-                }
-            } elseif ($this->isReferenceWrapperCall($arg->value)) {
-                $inner = $this->unwrapReferenceWrapperCall($arg->value, $arg);
-                if ($this->isVarExpr($inner)) {
-                    $name = $this->parseVariable($inner);
-                    $arg->value = $inner;
-                    $this->addPositionalCallArg($this->parseArgRefVar($arg, $name), $arrayArgsVar, $list_args, $forceArrayArgs);
-                    continue;
-                }
-                $expr = $this->expandReferenceWrapperExpr($inner, $arg);
-                if ($expr !== null) {
-                    $this->addPositionalCallArg($expr, $arrayArgsVar, $list_args, $forceArrayArgs);
-                    continue;
-                }
-                $this->fatalError($arg, 'The std::ref function only accepts a variable, array element, or object property');
-            } else {
-                if ($byRef) {
-                    if ($this->isScalar($arg->value)) {
-                        $this->fatalError($arg, 'The constants cannot be used as an argument for a reference-type parameter');
+                } elseif ($this->isArrayDimFetch($arg->value) and $this->isVarExpr($arg->value->var)) {
+                    $array = $this->parseIdentifier($arg->value->var);
+                    if ($array === 'GLOBALS') {
+                        $globalVar = $this->parseGlobalsArrayDimFetch($arg->value);
+                        // Global variable passed as a by-reference argument
+                        if ($byRef) {
+                            $ref = $this->addTmpVar(Type::REF);
+                            $this->context->beforeStmtLines[] = $ref . ' = ' . $globalVar . '.toReference();';
+                            $this->addPositionalCallArg('&' . $ref, $arrayArgsVar, $list_args, $forceArrayArgs);
+                        } else {
+                            $this->addPositionalCallArg(
+                                $this->materializeCallArgValue($arg->value, $globalVar),
+                                $arrayArgsVar,
+                                $list_args,
+                                $forceArrayArgs,
+                            );
+                        }
+                        continue;
                     }
-                    $tmpRef = $this->genTmpVarName();
-                    $this->addLocalVar($tmpRef, Type::REF);
-                    $this->context->beforeStmtLines[] = $tmpRef . ' = ' . $this->parseChainedExpr($arg->value, self::OP_REFVAL) . ';';
-                    $this->addPositionalCallArg('&' . $tmpRef, $arrayArgsVar, $list_args, $forceArrayArgs);
-                    continue;
+                    if ($this->isVarExpr($arg->value->var) and !$this->hasVar($array)) {
+                        $this->fatalError($arg, 'Undefined variable `$' . $array . '`');
+                    }
+                    if ($byRef) {
+                        if ($arg->value->dim === null) {
+                            $this->fatalError($arg, 'Array dimension must be a constant expression');
+                        }
+                        $this->addPositionalCallArg($array . '.itemRef(' . $this->identifierToStr($arg->value->dim) . ')', $arrayArgsVar, $list_args, $forceArrayArgs);
+                        continue;
+                    }
+                } elseif ($this->isReferenceWrapperCall($arg->value)) {
+                    $inner = $this->unwrapReferenceWrapperCall($arg->value, $arg);
+                    if ($this->isVarExpr($inner)) {
+                        $name = $this->parseVariable($inner);
+                        $arg->value = $inner;
+                        $this->addPositionalCallArg($this->parseArgRefVar($arg, $name), $arrayArgsVar, $list_args, $forceArrayArgs);
+                        continue;
+                    }
+                    $expr = $this->expandReferenceWrapperExpr($inner, $arg);
+                    if ($expr !== null) {
+                        $this->addPositionalCallArg($expr, $arrayArgsVar, $list_args, $forceArrayArgs);
+                        continue;
+                    }
+                    $this->fatalError($arg, 'The std::ref function only accepts a variable, array element, or object property');
+                } else {
+                    if ($byRef) {
+                        if ($this->isScalar($arg->value)) {
+                            $this->fatalError($arg, 'The constants cannot be used as an argument for a reference-type parameter');
+                        }
+                        $tmpRef = $this->genTmpVarName();
+                        $this->addLocalVar($tmpRef, Type::REF);
+                        $this->context->beforeStmtLines[] = $tmpRef . ' = ' . $this->parseChainedExpr($arg->value, self::OP_REFVAL) . ';';
+                        $this->addPositionalCallArg('&' . $tmpRef, $arrayArgsVar, $list_args, $forceArrayArgs);
+                        continue;
+                    }
                 }
+                $value = $this->parseOrderedDynamicCallArgValue($arg, $i, $lastHoistingArgIndex);
+                $this->addPositionalCallArg($value, $arrayArgsVar, $list_args, $forceArrayArgs);
             }
-            $value = $this->parseCallArgValue($arg);
-            $this->addPositionalCallArg($value, $arrayArgsVar, $list_args, $forceArrayArgs);
-        }
 
-        if ($argsVar !== null) {
-            return $namedArgsVar !== null ? $argsVar . ', ' . $namedArgsVar . '.array()' : $argsVar;
+            if ($argsVar !== null) {
+                $result = $namedArgsVar !== null ? $argsVar . ', ' . $namedArgsVar . '.array()' : $argsVar;
+            } elseif ($arrayArgsVar !== null) {
+                $result = $namedArgsVar !== null ? $arrayArgsVar . ', ' . $namedArgsVar . '.array()' : $arrayArgsVar;
+            } else {
+                // VarList deduces the fixed argument count and owns contiguous
+                // Variant storage, which PHPX passes directly to Zend without a
+                // dynamic php::Args allocation. materializeCallArgValue() above
+                // ensures that ordinary values do not leave INDIRECT borrows in the
+                // list; explicit reference arguments remain references.
+                $callArgs = Symbol::varList() . '{' . implode(', ', $list_args) . '}';
+                $result = $namedArgsVar !== null ? $callArgs . ', ' . $namedArgsVar . '.array()' : $callArgs;
+            }
+            $this->scheduleCallArgumentCleanup(
+                $afterStmtStart,
+                $argsVar,
+                $arrayArgsVar,
+                $namedArgsVar,
+            );
+            return $result;
+        } finally {
+            array_pop($this->context->typedRefBridgeScopes);
         }
-        if ($arrayArgsVar !== null) {
-            return $namedArgsVar !== null ? $arrayArgsVar . ', ' . $namedArgsVar . '.array()' : $arrayArgsVar;
-        }
-        // VarList deduces the fixed argument count and owns contiguous
-        // Variant storage, which PHPX passes directly to Zend without a
-        // dynamic php::Args allocation. materializeCallArgValue() above
-        // ensures that ordinary values do not leave INDIRECT borrows in the
-        // list; explicit reference arguments remain references.
-        $callArgs = Symbol::varList() . '{' . implode(', ', $list_args) . '}';
-        return $namedArgsVar !== null ? $callArgs . ', ' . $namedArgsVar . '.array()' : $callArgs;
     }
 
     private function isExistingReferenceCallArg(Node\Arg $arg): bool
@@ -642,9 +678,30 @@ trait CallArgumentGenerator
         if ($namedArgsVar === null) {
             $namedArgsVar = $this->genTmpVarName();
             $this->context->beforeStmtLines[] = Type::ARRAY . ' ' . $namedArgsVar . ';';
-            $this->context->afterStmtLines[] = $namedArgsVar . '.unset();';
         }
         return $namedArgsVar;
+    }
+
+    /** Release compiler-owned argument containers before typed-ref commit. */
+    private function scheduleCallArgumentCleanup(
+        int $afterStmtStart,
+        ?string $argsVar,
+        ?string $arrayArgsVar,
+        ?string $namedArgsVar,
+    ): void {
+        $cleanup = [];
+        if ($argsVar !== null) {
+            $cleanup[] = $argsVar . '.clear();';
+        }
+        if ($arrayArgsVar !== null) {
+            $cleanup[] = $arrayArgsVar . '.unset();';
+        }
+        if ($namedArgsVar !== null) {
+            $cleanup[] = $namedArgsVar . '.unset();';
+        }
+        if ($cleanup !== []) {
+            array_splice($this->context->afterStmtLines, $afterStmtStart, 0, $cleanup);
+        }
     }
 
     protected function addPositionalCallArg(
@@ -682,12 +739,23 @@ trait CallArgumentGenerator
         // Those statements are placed before the whole outer call and would
         // overtake an earlier Call left inside the initializer list. Complete
         // each direct Call in a temporary before lowering the next argument.
-        $expr = $arg->value instanceof Expr\FuncCall
-            || $arg->value instanceof Expr\MethodCall
-            || $arg->value instanceof Expr\StaticCall
+        $expr = $this->shouldMaterializeOrderedOperand($arg->value)
             ? $this->parseOrderedArg($arg)
             : $this->parseArg($arg);
         return $this->materializeCallArgValue($arg->value, $expr);
+    }
+
+    /** Preserve PHP's left-to-right value snapshots when a later argument is hoisted. */
+    private function parseOrderedDynamicCallArgValue(
+        Node\Arg $arg,
+        int $argIndex,
+        int $lastHoistingArgIndex,
+    ): string {
+        if ($argIndex < $lastHoistingArgIndex && $this->isSnapshotableVariableRead($arg->value)) {
+            $expr = $this->parseOrderedOperand($arg->value, false, true);
+            return $this->materializeCallArgValue($arg->value, $expr);
+        }
+        return $this->parseCallArgValue($arg);
     }
 
     protected function materializeCallArgValue(NodeAbstract $value, string $expr): string
@@ -718,7 +786,8 @@ trait CallArgumentGenerator
             return !$this->isStdContainerExpr($value);
         }
 
-        return $value instanceof Expr\PropertyFetch;
+        return $value instanceof Expr\PropertyFetch
+            || $value instanceof Expr\StaticPropertyFetch;
     }
 
     protected function assertCallArgumentLimit(array $args): void
@@ -844,9 +913,14 @@ trait CallArgumentGenerator
             // For a by-reference parameter, an undefined variable may be passed;
             // it is created immediately as a reference
             $this->addLocalVar($name, Type::REF);
-        } elseif ($this->getVarType($name) === Type::REF) {
+        } elseif ($this->getRawVarType($name) === Type::REF) {
             return '&' . $name;
         } else {
+            $rawType = $this->getRawVarType($name);
+            $valueType = Type::getReferencedType($rawType);
+            if (Type::getReferenceType($valueType) !== null) {
+                return '&' . $this->getDynamicTypedRefBridge($name, $valueType) . '.ref()';
+            }
             $this->assertVariableReferenceStorage($arg->value, $arg, $name);
             // For a by-reference parameter, use a temporary variable as the reference
             // and replace the actual argument with it
@@ -859,6 +933,30 @@ trait CallArgumentGenerator
         // so the & operator must be used to take the address and pass a pointer
         // in order to preserve pass-by-reference semantics
         return '&' . $name;
+    }
+
+    /**
+     * Bridge fixed native storage into one dynamic Zend call. Typed aliases
+     * sharing a canonical root reuse one wrapper within the current argument
+     * list, preserving PHP reference identity and preventing competing writes.
+     */
+    private function getDynamicTypedRefBridge(string $name, string $valueType): string
+    {
+        $root = $this->context->typedRefRoots[$name] ?? $name;
+        $scopeIndex = array_key_last($this->context->typedRefBridgeScopes);
+        if ($scopeIndex === null) {
+            throw new \LogicException('Typed reference bridge requires an active call-argument scope');
+        }
+        if (isset($this->context->typedRefBridgeScopes[$scopeIndex][$root])) {
+            return $this->context->typedRefBridgeScopes[$scopeIndex][$root];
+        }
+
+        $wrapper = $this->genTmpVarName();
+        $this->context->typedRefBridgeScopes[$scopeIndex][$root] = $wrapper;
+        $this->context->beforeStmtLines[] = 'php::RefWrap<' . $valueType . '> '
+            . $wrapper . '(' . $name . ');';
+        $this->context->afterStmtLines[] = $wrapper . '.commit();';
+        return $wrapper;
     }
 
     protected function parseArg(Node\Arg $arg): string
@@ -916,5 +1014,4 @@ trait CallArgumentGenerator
         }
         return $this->parseExpr($value);
     }
-
 }

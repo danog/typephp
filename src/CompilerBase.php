@@ -764,8 +764,11 @@ class CompilerBase implements PropertyAccessContext
         if (isset($this->context->declaredObjects[$object])) {
             return $this->context->declaredObjects[$object];
         }
-        if (isset($this->context->objects[$object]) || isset($this->context->stableObjects[$object])) {
-            return $this->getObjectType($object);
+        if (isset($this->context->objects[$object])) {
+            return $this->context->objects[$object];
+        }
+        if (isset($this->context->stableObjects[$object])) {
+            return $this->context->stableObjects[$object];
         }
         return '';
     }
@@ -2475,7 +2478,10 @@ class CompilerBase implements PropertyAccessContext
                     $remainingVariableUses[$name]--;
                     // Only consume a local on its final occurrence. Globals and
                     // statics outlive the function and must never be emptied.
-                    if ($remainingVariableUses[$name] === 0 && $this->hasLocalVar($name)) {
+                    if ($remainingVariableUses[$name] === 0
+                        && $this->hasLocalVar($name)
+                        && !Type::isTypedRefType($this->getRawVarType($name))
+                    ) {
                         $value = 'std::move(' . $value . ')';
                     }
                 }
@@ -5019,6 +5025,29 @@ class CompilerBase implements PropertyAccessContext
             $varName = '`$' . $this->parseIdentifier($left) . '`';
         }
         $this->fatalError($left, "Cannot re-assign $varName from `{$fromType}` to `{$toType}`");
+    }
+
+    protected function checkTypedReferenceAssignExpr(
+        NodeAbstract $left,
+        string $referenceType,
+        string $fromType,
+    ): void {
+        $targetType = Type::getReferencedType($referenceType);
+        $fromType = Type::getReferencedType($fromType);
+        if ($fromType === Type::VAR || $fromType === Type::REF) {
+            return;
+        }
+        $compatible = $targetType === Type::FLOAT
+            ? ($fromType === Type::FLOAT || $fromType === Type::INT)
+            : $fromType === $targetType;
+        if ($compatible) {
+            return;
+        }
+
+        $varName = $this->isVarExpr($left)
+            ? '`$' . $this->parseIdentifier($left) . '`'
+            : 'typed reference';
+        $this->fatalError($left, "Cannot re-assign {$varName} from `{$fromType}` to `{$targetType}`");
     }
 
     /**

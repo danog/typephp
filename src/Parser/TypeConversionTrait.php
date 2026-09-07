@@ -241,6 +241,7 @@ trait TypeConversionTrait
 
     protected function convertExprFromType(string $type, string $expr): string
     {
+        $type = Type::getReferencedType($type);
         if ($type === Type::FLOAT) {
             return $this->convertFloatExpr($expr);
         }
@@ -295,10 +296,12 @@ trait TypeConversionTrait
     }
 
     /**
-     * PHP references are untyped zval aliases. Exposing fixed C++ storage as
-     * one would let dynamic code replace the value with an incompatible type.
-     * Only php::Var (or an existing php::Ref) has storage that can safely
-     * participate in Zend reference semantics.
+     * A reference created from an ordinary local has no Zend type source.
+     * Exposing fixed C++ storage through such a reference would therefore let
+     * dynamic code replace the value with an incompatible type. Typed object
+     * and static properties are deliberately handled before this method: Zend
+     * attaches their property_info to the reference and enforces the declared
+     * type. PHP array elements are dynamic zval slots and use the same Ref path.
      */
     protected function assertVariableReferenceStorage(
         NodeAbstract $expr,

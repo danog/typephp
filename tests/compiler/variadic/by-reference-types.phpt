@@ -26,7 +26,7 @@ function normalize(int|string &...$values): void
     unset($value);
 }
 
-function bump_objects(Counter &...$values): void
+function bump_objects(mixed &...$values): void
 {
     foreach ($values as $value) {
         $value->value++;

@@ -2642,19 +2642,23 @@ class EvaluatedValue
         $evaluationState = new \stdClass();
         $evaluationState->isUnknownConstValue = false;
 
-        $evaluator = null;
-        $evaluator = new ConstExprEvaluator(
+        // The holder permits recursive evaluator access without taking a
+        // reference to an object-typed local. TypePHP intentionally rejects
+        // object references because objects already have identity.
+        $evaluator = new \stdClass();
+        $evaluator->instance = null;
+        $evaluator->instance = new ConstExprEvaluator(
             static function (Expr $expr) use (
                 $allConstInfos,
                 $evaluationState,
-                &$evaluator,
+                $evaluator,
             ) {
                 // php-parser's ConstExprEvaluator predates PHP 8.5 constant
                 // expression casts. Keep the compatibility logic in TypePHP:
                 // validation has already rejected void and disallowed object
                 // casts before declaration values reach gen_stub.php.
                 if ($expr instanceof Expr\Cast) {
-                    $value = $evaluator->evaluateDirectly($expr->expr);
+                    $value = $evaluator->instance->evaluateDirectly($expr->expr);
                     return match (true) {
                         $expr instanceof Expr\Cast\Int_ => (int) $value,
                         $expr instanceof Expr\Cast\Double => (float) $value,
@@ -2737,7 +2741,7 @@ class EvaluatedValue
             }
         );
 
-        $result = $evaluator->evaluateDirectly($expr);
+        $result = $evaluator->instance->evaluateDirectly($expr);
 
         $enumCaseRef = null;
         if ($result instanceof \TypePhp\Entity\EnumCaseRef) {
@@ -6049,13 +6053,14 @@ function generateArgInfoCode(
         $code .= "\n";
     }
 
-    $generatedFuncInfos = [];
+    $generatedFuncInfos = new \stdClass();
+    $generatedFuncInfos->values = [];
 
     $argInfoCode = generateCodeWithConditions(
         $fileInfo->getAllFuncInfos(), "\n",
-        static function (FuncInfo $funcInfo) use (&$generatedFuncInfos, $fileInfo) {
+        static function (FuncInfo $funcInfo) use ($generatedFuncInfos, $fileInfo) {
             /* If there already is an equivalent arginfo structure, only emit a #define */
-            if ($generatedFuncInfo = $funcInfo->findEquivalent($generatedFuncInfos)) {
+            if ($generatedFuncInfo = $funcInfo->findEquivalent($generatedFuncInfos->values)) {
                 $code = sprintf(
                     "#define %s %s\n",
                     $funcInfo->getArgInfoName(), $generatedFuncInfo->getArgInfoName()
@@ -6064,7 +6069,7 @@ function generateArgInfoCode(
                 $code = $funcInfo->toArgInfoCode($fileInfo->getMinimumPhpVersionIdCompatibility());
             }
 
-            $generatedFuncInfos[] = $funcInfo;
+            $generatedFuncInfos->values[] = $funcInfo;
             return $code;
         }
     );
@@ -6085,16 +6090,17 @@ function generateArgInfoCode(
             $code .= "$framelessFunctionCode\n";
         }
 
-        $generatedFunctionDeclarations = [];
+        $generatedFunctionDeclarations = new \stdClass();
+        $generatedFunctionDeclarations->keys = [];
         $code .= generateCodeWithConditions(
             $fileInfo->getAllFuncInfos(), "",
-            static function (FuncInfo $funcInfo) use ($fileInfo, &$generatedFunctionDeclarations) {
+            static function (FuncInfo $funcInfo) use ($fileInfo, $generatedFunctionDeclarations) {
                 $key = $funcInfo->getDeclarationKey();
-                if (isset($generatedFunctionDeclarations[$key])) {
+                if (isset($generatedFunctionDeclarations->keys[$key])) {
                     return null;
                 }
 
-                $generatedFunctionDeclarations[$key] = true;
+                $generatedFunctionDeclarations->keys[$key] = true;
                 return $fileInfo->declarationPrefix . $funcInfo->getDeclaration();
             }
         );
@@ -6184,10 +6190,12 @@ function generateFunctionEntries(?Name $className, array $funcInfos, ?string $co
  *   the name of a zend_string already created with that content
  */
 function generateFunctionAttributeInitialization(iterable $funcInfos, array $allConstInfos, ?int $phpVersionIdMinimumCompatibility, ?string $parentCond = null, array &$declaredStrings = []): string {
-    return generateCodeWithConditions(
+    $declaredStringState = new \stdClass();
+    $declaredStringState->values = $declaredStrings;
+    $code = generateCodeWithConditions(
         $funcInfos,
         "",
-        static function (FuncInfo $funcInfo) use ($allConstInfos, $phpVersionIdMinimumCompatibility, &$declaredStrings) {
+        static function (FuncInfo $funcInfo) use ($allConstInfos, $phpVersionIdMinimumCompatibility, $declaredStringState) {
             $code = null;
 
             if ($funcInfo->name instanceof MethodName) {
@@ -6200,10 +6208,10 @@ function generateFunctionAttributeInitialization(iterable $funcInfos, array $all
             // conditionally available; string reuse is only among declarations
             // that are always there
             if ($funcInfo->cond) {
-                $empty = [];
-                $useDeclared = &$empty;
+                $useDeclared = new \stdClass();
+                $useDeclared->values = [];
             } else {
-                $useDeclared = &$declaredStrings;
+                $useDeclared = $declaredStringState;
             }
 
             foreach ($funcInfo->attributes as $key => $attribute) {
@@ -6213,7 +6221,7 @@ function generateFunctionAttributeInitialization(iterable $funcInfos, array $all
                     "func_" . $funcInfo->name->getNameForAttributes() . "_$key",
                     $allConstInfos,
                     $phpVersionIdMinimumCompatibility,
-                    \std::ref($useDeclared)
+                    \std::ref($useDeclared->values)
                 );
             }
 
@@ -6225,7 +6233,7 @@ function generateFunctionAttributeInitialization(iterable $funcInfos, array $all
                         "func_{$funcInfo->name->getNameForAttributes()}_arg{$index}_$key",
                         $allConstInfos,
                         $phpVersionIdMinimumCompatibility,
-                        \std::ref($useDeclared)
+                        \std::ref($useDeclared->values)
                     );
                 }
             }
@@ -6234,6 +6242,13 @@ function generateFunctionAttributeInitialization(iterable $funcInfos, array $all
         },
         $parentCond
     );
+    // Keep the property read as a separate PHP value assignment. Calls above
+    // turn `values` into a zend_reference; assigning that reference expression
+    // directly to the by-reference parameter would rebind the local Reference
+    // wrapper instead of writing the array back to its caller.
+    $updatedDeclaredStrings = $declaredStringState->values;
+    $declaredStrings = $updatedDeclaredStrings;
+    return $code;
 }
 
 /**
@@ -6253,10 +6268,12 @@ function generateGlobalConstantAttributeInitialization(
     if ($phpVersionIdMinimumCompatibility !== null && $phpVersionIdMinimumCompatibility < PHP_85_VERSION_ID) {
         $isConditional = true;
     }
+    $declaredStringState = new \stdClass();
+    $declaredStringState->values = $declaredStrings;
     $code = generateCodeWithConditions(
         $constInfos,
         "",
-        static function (ConstInfo $constInfo) use ($allConstInfos, $isConditional, &$declaredStrings) {
+        static function (ConstInfo $constInfo) use ($allConstInfos, $isConditional, $declaredStringState) {
             $code = "";
 
             if ($constInfo->attributes === []) {
@@ -6266,10 +6283,10 @@ function generateGlobalConstantAttributeInitialization(
             // conditionally available; string reuse is only among declarations
             // that are always there
             if ($constInfo->cond) {
-                $empty = [];
-                $useDeclared = &$empty;
+                $useDeclared = new \stdClass();
+                $useDeclared->values = [];
             } else {
-                $useDeclared = &$declaredStrings;
+                $useDeclared = $declaredStringState;
             }
             $constName = str_replace('\\', '\\\\', $constInfo->name->__toString());
             $constVarName = 'const_' . $constName;
@@ -6281,7 +6298,7 @@ function generateGlobalConstantAttributeInitialization(
                     $constVarName . "_$key",
                     $allConstInfos,
                     PHP_85_VERSION_ID,
-                    \std::ref($useDeclared)
+                    \std::ref($useDeclared->values)
                 );
             }
 
@@ -6289,6 +6306,8 @@ function generateGlobalConstantAttributeInitialization(
         },
         $parentCond
     );
+    $updatedDeclaredStrings = $declaredStringState->values;
+    $declaredStrings = $updatedDeclaredStrings;
     if ($code && $isConditional) {
         return "\n#if (PHP_VERSION_ID >= " . PHP_85_VERSION_ID . ")\n" . $code . "#endif\n";
     }
@@ -6308,20 +6327,22 @@ function generateConstantAttributeInitialization(
     ?string $parentCond = null,
     array &$declaredStrings = []
 ): string {
-    return generateCodeWithConditions(
+    $declaredStringState = new \stdClass();
+    $declaredStringState->values = $declaredStrings;
+    $code = generateCodeWithConditions(
         $constInfos,
         "",
-        static function (ConstInfo $constInfo) use ($allConstInfos, $phpVersionIdMinimumCompatibility, &$declaredStrings) {
+        static function (ConstInfo $constInfo) use ($allConstInfos, $phpVersionIdMinimumCompatibility, $declaredStringState) {
             $code = null;
 
             // Make sure we don't try and use strings that might only be
             // conditionally available; string reuse is only among declarations
             // that are always there
             if ($constInfo->cond) {
-                $empty = [];
-                $useDeclared = &$empty;
+                $useDeclared = new \stdClass();
+                $useDeclared->values = [];
             } else {
-                $useDeclared = &$declaredStrings;
+                $useDeclared = $declaredStringState;
             }
             foreach ($constInfo->attributes as $key => $attribute) {
                 $code .= $attribute->generateCode(
@@ -6329,7 +6350,7 @@ function generateConstantAttributeInitialization(
                     "const_" . $constInfo->name->getDeclarationName() . "_$key",
                     $allConstInfos,
                     $phpVersionIdMinimumCompatibility,
-                    \std::ref($useDeclared)
+                    \std::ref($useDeclared->values)
                 );
             }
 
@@ -6337,6 +6358,9 @@ function generateConstantAttributeInitialization(
         },
         $parentCond
     );
+    $updatedDeclaredStrings = $declaredStringState->values;
+    $declaredStrings = $updatedDeclaredStrings;
+    return $code;
 }
 
 /**
@@ -7161,34 +7185,34 @@ function generateStubFile(string $stubFile, string $objectFile, bool $forceRegen
                 }
             }
 
-            array_map(
-                function(?ArgInfo $aliasArg, ?ArgInfo $aliasedArg) use ($aliasFunc, $aliasedFunc, &$errors) {
-                    if ($aliasArg === null) {
-                        assert($aliasedArg !== null);
-                        $errors[] = "{$aliasFunc->name}(): Argument \$$aliasedArg->name of aliased function {$aliasedFunc->name}() is missing";
-                        return null;
-                    }
+            $argCount = max(count($aliasArgs), count($aliasedArgs));
+            for ($argIndex = 0; $argIndex < $argCount; $argIndex++) {
+                $aliasArg = $aliasArgs[$argIndex] ?? null;
+                $aliasedArg = $aliasedArgs[$argIndex] ?? null;
+                if ($aliasArg === null) {
+                    assert($aliasedArg !== null);
+                    $errors[] = "{$aliasFunc->name}(): Argument \$$aliasedArg->name of aliased function {$aliasedFunc->name}() is missing";
+                    continue;
+                }
 
-                    if ($aliasedArg === null) {
-                        $errors[] = "{$aliasedFunc->name}(): Argument \$$aliasArg->name of alias function {$aliasFunc->name}() is missing";
-                        return null;
-                    }
+                if ($aliasedArg === null) {
+                    $errors[] = "{$aliasedFunc->name}(): Argument \$$aliasArg->name of alias function {$aliasFunc->name}() is missing";
+                    continue;
+                }
 
-                    if ($aliasArg->name !== $aliasedArg->name) {
-                        $errors[] = "{$aliasFunc->name}(): Argument \$$aliasArg->name and argument \$$aliasedArg->name of aliased function {$aliasedFunc->name}() must have the same name";
-                        return null;
-                    }
+                if ($aliasArg->name !== $aliasedArg->name) {
+                    $errors[] = "{$aliasFunc->name}(): Argument \$$aliasArg->name and argument \$$aliasedArg->name of aliased function {$aliasedFunc->name}() must have the same name";
+                    continue;
+                }
 
-                    if ($aliasArg->type != $aliasedArg->type) {
-                        $errors[] = "{$aliasFunc->name}(): Argument \$$aliasArg->name and argument \$$aliasedArg->name of aliased function {$aliasedFunc->name}() must have the same type";
-                    }
+                if ($aliasArg->type != $aliasedArg->type) {
+                    $errors[] = "{$aliasFunc->name}(): Argument \$$aliasArg->name and argument \$$aliasedArg->name of aliased function {$aliasedFunc->name}() must have the same type";
+                }
 
-                    if ($aliasArg->defaultValue !== $aliasedArg->defaultValue) {
-                        $errors[] = "{$aliasFunc->name}(): Argument \$$aliasArg->name and argument \$$aliasedArg->name of aliased function {$aliasedFunc->name}() must have the same default value";
-                    }
-                },
-                $aliasArgs, $aliasedArgs
-            );
+                if ($aliasArg->defaultValue !== $aliasedArg->defaultValue) {
+                    $errors[] = "{$aliasFunc->name}(): Argument \$$aliasArg->name and argument \$$aliasedArg->name of aliased function {$aliasedFunc->name}() must have the same default value";
+                }
+            }
 
             $aliasedReturn = $aliasedFunc->return;
             $aliasReturn = $aliasFunc->return;

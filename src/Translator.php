@@ -4594,9 +4594,14 @@ CODE;
         // separate pass so one trait method can call another method declared
         // later in the same or a nested trait.
         foreach ($composedTraitMethods as [$stmt, $origin]) {
-            $this->withTraitNameContext($origin, function () use ($stmt, &$methodCodes): void {
-                $this->parseClassMethod($stmt, $methodCodes);
+            $traitMethodCodes = $this->withTraitNameContext($origin, function () use ($stmt): array {
+                $codes = [];
+                $this->parseClassMethod($stmt, $codes);
+                return $codes;
             });
+            foreach ($traitMethodCodes as $methodName => $methodCode) {
+                $methodCodes[$methodName] = $methodCode;
+            }
         }
         if (!$class instanceof Node\Stmt\Trait_) {
             $this->validateOverrideAttributes($class);
@@ -4751,6 +4756,7 @@ CODE;
         }
 
         $callParams = '';
+        $refWrapVars = [];
         foreach ($functionDef->argInfoList as $k => $argInfo) {
             $var = 'arg_' . $argInfo->name;
             if ($argInfo->variadic) {
@@ -4791,7 +4797,18 @@ CODE;
                 }
                 $cppType = $this->getDefaultArgumentType($argInfo);
                 $declaredClass = $argInfo->declaredClass ?: $argInfo->class;
-                if ($this->isStrictScalarType($argInfo->type)) {
+                $expr = '';
+                if (Type::isTypedRefType($argInfo->type)) {
+                    $referencedType = Type::getReferencedType($argInfo->type);
+                    $refVar = 'ref_' . $var;
+                    $wrapVar = 'wrap_' . $var;
+                    $refWrapVars[] = $wrapVar;
+                    $cppCode .= $this->getIndent() . Type::REF . ' ' . $refVar . ' = ' . $argExpr . ';' . PHP_EOL;
+                    $cppCode .= $this->getIndent() . 'php::RefWrap<' . $referencedType . '> '
+                        . $wrapVar . '(' . $refVar . ');' . PHP_EOL;
+                    $cppCode .= $this->getIndent() . $cppType . ' ' . $var . ' = '
+                        . $wrapVar . '.typed();' . PHP_EOL;
+                } elseif ($this->isStrictScalarType($argInfo->type)) {
                     $rawVar = 'raw_' . $var;
                     $cppCode .= $this->getIndent() . Type::VAR . ' ' . $rawVar . ' = ' . $argExpr . ';' . PHP_EOL;
                     $cppCode .= $this->genStrictScalarParamCheck(
@@ -4806,7 +4823,9 @@ CODE;
                 } else {
                     $expr = $this->convertExprFromType($argInfo->type, $argExpr);
                 }
-                $cppCode .= $this->getIndent() . $cppType . ' ' . $var . ' = ' . $expr . ';' . PHP_EOL;
+                if (!Type::isTypedRefType($argInfo->type)) {
+                    $cppCode .= $this->getIndent() . $cppType . ' ' . $var . ' = ' . $expr . ';' . PHP_EOL;
+                }
             }
             $callParam = $var;
             if ($this->canConsumeForwardedArgument($argInfo)) {
@@ -4832,12 +4851,18 @@ CODE;
 
         if ($functionDef->returnType !== Type::VOID) {
             $cppCode .= $this->getIndent() . 'auto retval = ' . $fn . '(' . $callParams . ');' . PHP_EOL;
+            foreach ($refWrapVars as $refWrapVar) {
+                $cppCode .= $this->getIndent() . $refWrapVar . '.commit();' . PHP_EOL;
+            }
             $cppCode .= $this->getIndent() . 'php::move(retval, return_value);' . PHP_EOL;
             if (!$functionDef->returnsByRef) {
                 $cppCode .= $this->getIndent() . 'php::deref(return_value);' . PHP_EOL;
             }
         } else {
             $cppCode .= $this->getIndent() . $fn . '(' . $callParams . ');' . PHP_EOL;
+            foreach ($refWrapVars as $refWrapVar) {
+                $cppCode .= $this->getIndent() . $refWrapVar . '.commit();' . PHP_EOL;
+            }
         }
         $this->indentLevel--;
         $cppCode .= $this->getIndent() . '} catch (zend_object *) {' . PHP_EOL;
@@ -5833,7 +5858,9 @@ CODE;
         }
 
         $declaredClass = $arg->declaredClass ?: $arg->class;
-        return match ($arg->type) {
+        // Typed-ref is a native ABI detail. Signature compatibility is based
+        // on the PHP value type plus the independently checked byRef flag.
+        return match (Type::getReferencedType($arg->type)) {
             Type::INT => [['kind' => 'isInt']],
             Type::FLOAT => [['kind' => 'isFloat']],
             Type::BOOL => [['kind' => 'isBool']],

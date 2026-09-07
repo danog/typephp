@@ -1080,6 +1080,12 @@ trait PropertyAccessTrait
                 if (!$this->hasVar($name)) {
                     $this->errorUndefinedVariable($var);
                 }
+                if ($this->isTypedRefLocal($name)) {
+                    $this->fatalError($var, 'Cannot unset typed reference variable `$' . $this->unescapeVarName($name) . '`');
+                }
+                if ($this->isTypedRefRoot($name)) {
+                    $this->fatalError($var, 'Cannot unset variable `$' . $this->unescapeVarName($name) . '` while typed references point to it');
+                }
                 $type = $this->getVarType($name);
                 if ($this->isNativeObjectVar($name)) {
                     $this->forgetNativeObjectNonNull($name);

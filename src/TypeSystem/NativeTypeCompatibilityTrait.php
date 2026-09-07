@@ -257,6 +257,51 @@ trait NativeTypeCompatibilityTrait
                     $this->addLocalVar($var, Type::VAR);
                 }
             }
+
+            if (Type::isTypedRefType($argInfo->type)) {
+                $expectedType = Type::getReferencedType($argInfo->type);
+                $actualType = Type::getReferencedType($this->detectTypeOfExpr($arg->value));
+                if ($this->isVarExpr($arg->value)) {
+                    $var = $this->parseIdentifier($arg->value);
+                    $rawType = $this->getRawVarType($var);
+                    if ($actualType === $expectedType
+                        && ($rawType === $expectedType || $rawType === $argInfo->type)
+                    ) {
+                        return $var;
+                    }
+                }
+
+                if ($actualType !== $expectedType
+                    && !in_array($actualType, [Type::VAR, Type::REF], true)
+                ) {
+                    $this->fatalError(
+                        $arg,
+                        'Cannot pass value of type ' . $actualType
+                            . ' to reference parameter of type ' . $argInfo->type,
+                    );
+                }
+
+                $reference = $this->addTmpVar(Type::REF);
+                $wrapper = $this->genTmpVarName();
+                $this->context->beforeStmtLines[] = $reference . ' = ' . $this->convertToRef($arg->value) . ';';
+                $this->context->beforeStmtLines[] = 'php::RefWrap<' . $expectedType . '> '
+                    . $wrapper . '(' . $reference . ');';
+                $this->context->afterStmtLines[] = $wrapper . '.commit();';
+                return $wrapper . '.typed()';
+            }
+
+            // A mixed/union/defaulted reference parameter keeps the php::Ref
+            // ABI. When its caller is one of the five fixed native locals,
+            // bridge that storage for exactly this call and validate the
+            // write-back afterwards instead of weakening the local to Var.
+            if ($this->isVarExpr($arg->value)) {
+                $var = $this->parseIdentifier($arg->value);
+                $rawType = $this->getRawVarType($var);
+                $valueType = Type::getReferencedType($rawType);
+                if (Type::getReferenceType($valueType) !== null) {
+                    return $this->getDynamicTypedRefBridge($var, $valueType) . '.ref()';
+                }
+            }
             return $this->convertToRef($arg->value);
         }
 

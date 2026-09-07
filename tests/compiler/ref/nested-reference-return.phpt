@@ -25,6 +25,11 @@ function &object_property_ref(NestedReferenceBox $box): mixed
 
 function main(): void
 {
+    $fixedValues = ['item' => 'fixed-before'];
+    $fixedItem =& array_element_ref($fixedValues);
+    $fixedItem = 'fixed-after';
+    var_dump($fixedValues['item']);
+
     $values = std::any([
         'item' => 'before',
         'outer' => ['inner' => 'nested-before'],
@@ -45,6 +50,7 @@ function main(): void
 }
 ?>
 --EXPECT--
+string(11) "fixed-after"
 string(5) "after"
 string(12) "nested-after"
 string(12) "object-after"

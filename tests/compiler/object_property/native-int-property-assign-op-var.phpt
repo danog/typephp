@@ -2,6 +2,8 @@
 Native int property compound assignment from var
 --FILE--
 <?php
+use varint_types;
+
 class NativeIntAssignOpBox
 {
     public int $value = 1;

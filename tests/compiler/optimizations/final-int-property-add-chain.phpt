@@ -2,6 +2,7 @@
 Final int property addition uses a detached value accumulator
 --FILE--
 <?php
+use varint_types;
 
 final class AddChain
 {

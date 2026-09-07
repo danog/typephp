@@ -72,6 +72,14 @@ class FunctionContext
     public array $explicitNativeTypeVars = [];
     /** @var array<string, string> C++ initializers folded into function-scope local declarations. */
     public array $localVarInitializers = [];
+    /** @var array<string, string> typed-ref local => directly referenced local. */
+    public array $typedRefBindings = [];
+    /** @var array<string, string> typed-ref local => canonical fixed-storage root. */
+    public array $typedRefRoots = [];
+    /** @var array<string, array<string, true>> canonical root => aliases. */
+    public array $typedRefAliases = [];
+    /** @var list<array<string, string>> active dynamic-call root => RefWrap variable scopes. */
+    public array $typedRefBridgeScopes = [];
     public array $staticVars = [];
     public array $globalVars = [];
 
@@ -129,6 +137,10 @@ class FunctionContext
         $this->localVars = [];
         $this->explicitNativeTypeVars = [];
         $this->localVarInitializers = [];
+        $this->typedRefBindings = [];
+        $this->typedRefRoots = [];
+        $this->typedRefAliases = [];
+        $this->typedRefBridgeScopes = [];
         $this->staticVars = [];
         $this->arguments = [];
         $this->immutableVars = [];
@@ -184,6 +196,10 @@ class FunctionContext
     {
         $this->localVars = $localVars;
         $this->localVarInitializers = [];
+        $this->typedRefBindings = [];
+        $this->typedRefRoots = [];
+        $this->typedRefAliases = [];
+        $this->typedRefBridgeScopes = [];
         $this->tmpVarIndex = $tmpVarIndex;
         $this->declaredObjects = $declaredObjects;
         $this->nativeObjects = $nativeObjects;
