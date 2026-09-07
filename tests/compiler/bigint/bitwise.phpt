@@ -2,7 +2,6 @@
 BigInt bitwise operations (&, |, ^, ~, &=, |=, ^=, testBit, popCount)
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $a = std::bigInt("240");  // 0xF0
     $b = std::bigInt("15");   // 0x0F

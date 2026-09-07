@@ -38,7 +38,7 @@ function main(): void
     var_dump($sum(...$arguments));
 
     $increment = 'cached_increment';
-    $value = 10;
+    $value = std::any(10);
     var_dump($increment(std::ref($value)));
     var_dump($value);
 

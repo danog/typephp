@@ -734,8 +734,8 @@ trait BinaryOpTrait
                 || $this->usesNativeScalarStorage($type)
             ) {
                 // Calls and nested binary operands are materialized to preserve
-                // PHP's left-to-right evaluation order. In native-types mode
-                // their scalar result has a fixed C++ representation, so
+                // PHP's left-to-right evaluation order. A statically native
+                // scalar result has a fixed C++ representation, so
                 // boxing it in a Variant would add dynamic arithmetic and zval
                 // lifetime work to otherwise native expressions.
                 return $type;
@@ -781,8 +781,8 @@ trait BinaryOpTrait
         // around a side effect is materialized for evaluation order, but its
         // lowered C++ form can still be dynamic — `-strlen($s)` on an
         // unqualified namespaced call lowers to `-(php::call(...))`, a
-        // Variant. Outside native-types mode the temporary must stay dynamic,
-        // matching the call and binary-op policy above.
+        // Variant. When its type is not statically fixed the temporary must
+        // stay dynamic, matching the call and binary-op policy above.
         return Type::VAR;
     }
 

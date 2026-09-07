@@ -77,7 +77,7 @@ incompatible with or more restrictive than standard PHP.
 
 - `declare(ticks=...)` is not supported.
 - `declare(encoding=...)` accepts only `UTF-8`.
-- `declare(strict_types=...)` accepts only `strict_types=1`.
+- TypePHP always uses strict typing. `declare(strict_types=1)` is accepted but redundant; `strict_types=0` is rejected.
 - No other `declare` directives are supported.
 
 ## Calls and references
@@ -103,6 +103,15 @@ incompatible with or more restrictive than standard PHP.
   used explicitly.
 - `std::ref()` / `toRef()` only accept variables, array elements, or object
   properties.
+- A local with fixed storage (`Int`, `Float`, `Bool`, `Str`, `Array`, `Object`,
+  `Stream`, high-precision values, or a `std` container) cannot be made into a
+  PHP reference. Zend references are untyped and could replace such storage
+  with an incompatible value. Objects, streams, typed objects, and `std`
+  containers already use handle/reference-like value semantics, so adding a
+  PHP reference to the local variable is unnecessary as well. Initialize the
+  value with `std::any()` when PHP reference semantics are required, then
+  convert it back explicitly with a keyword such as `toArray()` or
+  `toString()`.
 - A call that uses argument unpacking followed by named arguments falls back to
   dynamic dispatch and cannot use the native call path.
 

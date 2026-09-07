@@ -847,10 +847,7 @@ trait CallArgumentGenerator
         } elseif ($this->getVarType($name) === Type::REF) {
             return '&' . $name;
         } else {
-            // A local variable of native type is converted to a plain variable
-            if ($this->hasLocalVar($name) and $this->isNativeType($this->getVarType($name))) {
-                $this->context->localVars[$name] = Type::VAR;
-            }
+            $this->assertVariableReferenceStorage($arg->value, $arg, $name);
             // For a by-reference parameter, use a temporary variable as the reference
             // and replace the actual argument with it
             $tmpVar = $this->genTmpVarName();

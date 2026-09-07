@@ -2,7 +2,6 @@
 Decimal operator overloading (+, -, *, /, %) and comparisons
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $dec = std::decimal("100.25");
 

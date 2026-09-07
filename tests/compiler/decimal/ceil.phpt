@@ -2,7 +2,6 @@
 Decimal: ceil
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $a = std::decimal("3.2");
     var_dump($a->ceil()->toString());

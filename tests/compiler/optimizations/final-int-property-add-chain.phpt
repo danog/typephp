@@ -2,7 +2,6 @@
 Final int property addition uses a detached value accumulator
 --FILE--
 <?php
-declare(strict_types=1);
 
 final class AddChain
 {

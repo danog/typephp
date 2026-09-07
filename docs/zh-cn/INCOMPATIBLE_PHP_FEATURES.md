@@ -36,7 +36,7 @@
 
 - 不支持 `declare(ticks=...)`。
 - `declare(encoding=...)` 只允许 `UTF-8`。
-- `declare(strict_types=...)` 只允许 `strict_types=1`。
+- TypePHP 始终使用严格类型。`declare(strict_types=1)` 可兼容接受但没有作用；`strict_types=0` 会被拒绝。
 - 不支持其他 `declare` 指令。
 
 ## 调用与引用
@@ -48,6 +48,12 @@
 - 引用赋值不支持从复杂静态属性表达式建立引用。
 - 动态调用、闭包调用等编译期无法确定参数签名的调用，不能自动转换引用参数；需要显式使用 `std::ref()` 或等价关键词方法 `toRef()`。
 - `std::ref()` / `toRef()` 只接受变量、数组元素或对象属性。
+- 采用固定存储的局部变量（`Int`、`Float`、`Bool`、`Str`、`Array`、`Object`、
+  `Stream`、高精度值或 `std` 容器）不能转换为 PHP 引用。Zend 引用没有类型约束，
+  可能把固定存储替换成不兼容的值。对象、stream、typed object 与 `std` 容器本身
+  已采用句柄或引用式值语义，再对局部变量建立 PHP 引用也没有意义。确需 PHP 引用
+  语义时，应使用 `std::any()` 初始化，完成引用操作后再通过 `toArray()`、
+  `toString()` 等关键词显式转换回来。
 - 带 unpack 且尾部追加 named arguments 的调用会退化为动态调用，不能使用 native call。
 
 ## 对象模型

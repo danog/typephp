@@ -40,7 +40,7 @@ function make_dynamic_class_argument(): string
 
 function main(): void
 {
-    $class = DynamicClassFirst::class;
+    $class = std::any(DynamicClassFirst::class);
     var_dump($class::render(replace_dynamic_class($class)));
     var_dump($class::render('next'));
     var_dump(choose_dynamic_class()::render(make_dynamic_class_argument()));

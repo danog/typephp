@@ -2,7 +2,6 @@
 Constant bit shift boundaries follow PHP semantics
 --FILE--
 <?php
-declare(strict_types=1);
 
 function main(): void
 {

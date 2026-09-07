@@ -2,7 +2,6 @@
 Decimal: sqrt
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $a = std::decimal("0");
     var_dump($a->sqrt()->toString());

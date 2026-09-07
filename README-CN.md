@@ -109,8 +109,11 @@ AST，待全部项目符号就绪后再在 convert 阶段解析。这一两阶�
 - **原生进程入口。** 二进制模式直接启动原生可执行文件，不需要 PHP CLI 或独立的
   解释器进程。可执行文件仍会嵌入或链接 PHPX、`libphp` 及项目配置的原生库，部署包
   中必须提供这些运行时依赖。
-- **渐进式类型，真正带来收益。** 只在性能关键处添加 `use native_types`、`std::`
-  容器和类型声明，其余保持普通 PHP。
+- **默认使用强标量类型。** 推断出的 `int`、`float`、`bool` 局部变量直接使用
+  C++ 原生存储。单个动态值使用 `std::any()`；只有文件确实依赖 PHP 整数扩展语义时，
+  才使用 `use varint_types`。
+- **始终严格调用。** TypePHP 不启用 PHP 的弱标量类型转换，无需声明
+  `declare(strict_types=1)`。
 - **Zend 生态互通。** 扩展模式以标准 PHP 扩展形式加载，项目可以调用受支持的
   内置函数，并显式声明依赖的其他 Zend 扩展。
 
@@ -299,7 +302,9 @@ TypePHP 会在适合 AOT 编译的范围内保持 PHP 语法和运行行为，�
 
 - 全局作用域只允许声明，可执行语句必须位于函数或方法内；
 - 二进制模式对 `main()` 使用严格签名；
-- `use native_types` 会让标量声明使用固定原生存储，之后不能改为不兼容类型；
+- 推断出的 `int`、`float`、`bool` 默认使用固定原生存储，之后不能改为不兼容类型；
+- `use varint_types` 使推断出的整数存入 `php::Var`，保留 PHP 的整数溢出和除法语义；
+  `std::any()` 则只擦除单个表达式的静态类型；
 - 静态可确定的调用和属性会直接编译，受支持的动态操作则通过 PHPX/Zend runtime
   fallback 执行；
 - `.stub.php` 用于声明 C++ 或外部库 API，函数体必须为空，stub 文件禁止声明
@@ -367,7 +372,6 @@ function main(): void
 
 ```php
 <?php
-use native_types;
 
 function fib(int $n): int
 {
@@ -391,15 +395,14 @@ bin/tpc.php fib.php -O3 -o fib
 ./fib 30
 ```
 
-使用 `use native_types` 后，`int` 变量变为 C++ `int64_t`，算术运算直接编译为
-CPU 指令，而不是 ZendVM 调用。
+默认情况下，推断和声明的 `int` 变量都会变为 C++ `int64_t`，算术运算直接编译为
+CPU 指令，而不是 ZendVM 调用。仅当本文件需要 PHP 的整数溢出转浮点、整数除法产生
+非整数结果等语义时，才添加 `use varint_types`。
 
 ### 2. 高精度数值
 
 ```php
 <?php
-declare(strict_types=1);
-use native_types;
 
 function main(): void
 {
@@ -425,7 +428,6 @@ function main(): void
 
 ```php
 <?php
-use native_types;
 
 function main(): void
 {

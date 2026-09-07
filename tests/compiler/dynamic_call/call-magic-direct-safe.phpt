@@ -51,7 +51,7 @@ function main(): void
 
     // Zend constructs __call()'s argument array by value. A source reference
     // must not leak into that array, including on the direct compiled path.
-    $source = 'original';
+    $source = std::any('original');
     $reference = &$source;
     $mutating = new MutatingMagic();
     var_dump($mutating->missing($reference));

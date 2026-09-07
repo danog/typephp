@@ -298,6 +298,16 @@ trait AssignOpTrait
                         . $this->parseAssignToList($item->value, $itemExpr)
                         . PHP_EOL;
                 } else {
+                    // Destructuring is an indirect write form. It must not
+                    // inherit the direct-assignment initialization exception
+                    // for readonly properties.
+                    $writeTarget = $item->value;
+                    while ($writeTarget instanceof Expr\ArrayDimFetch) {
+                        $writeTarget = $writeTarget->var;
+                    }
+                    if ($writeTarget instanceof Expr\PropertyFetch) {
+                        $this->preparePropertyWriteTarget($writeTarget, false);
+                    }
                     // Route every destructuring target through the normal
                     // assignment pipeline. Existing native locals remain
                     // native and receive the usual scalar conversion, while
@@ -1527,7 +1537,7 @@ trait AssignOpTrait
         $rightExpr = '';
 
         if ($this->isVarExpr($expr->expr)) {
-            $rightExpr = $tmpVar . ' = ' . $this->parseIdentifier($expr->expr) . '.toReference()';
+            $rightExpr = $tmpVar . ' = ' . $this->convertToRef($expr->expr);
         } elseif ($expr->expr instanceof Expr\FuncCall && $this->isNameExpr($expr->expr->name)) {
             $name = $this->parseIdentifier($expr->expr->name);
             $function = $this->findNativeFunction($name);

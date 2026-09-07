@@ -290,14 +290,43 @@ trait TypeConversionTrait
             return $this->emitStaticPropertyFetchRef($expr, $expr);
         }
         $var = $this->parseIdentifier($expr);
-        if ($this->isVarExpr($expr) and $this->isNativeTypeVar($var)) {
-            $this->fatalError(
-                $expr,
-                'Cannot create a reference to native variable of type ' . $this->getVarType($var)
-                    . '; initialize it with std::any() when reference semantics are required',
-            );
-        }
+        $this->assertVariableReferenceStorage($expr, $expr, $var);
         return $var . '.toReference()';
+    }
+
+    /**
+     * PHP references are untyped zval aliases. Exposing fixed C++ storage as
+     * one would let dynamic code replace the value with an incompatible type.
+     * Only php::Var (or an existing php::Ref) has storage that can safely
+     * participate in Zend reference semantics.
+     */
+    protected function assertVariableReferenceStorage(
+        NodeAbstract $expr,
+        NodeAbstract $errorNode,
+        ?string $name = null,
+    ): void {
+        if (!$this->isVarExpr($expr)) {
+            return;
+        }
+
+        $name ??= $this->parseIdentifier($expr);
+        if (!$this->hasVar($name)) {
+            return;
+        }
+
+        $type = $this->hasStaticVar($name)
+            ? $this->context->staticVars[$name]
+            : $this->getVarType($name);
+        if ($type === Type::VAR || $type === Type::REF) {
+            return;
+        }
+
+        $this->fatalError(
+            $errorNode,
+            'Cannot create a reference to variable $' . $this->unescapeVarName($name)
+                . ' of fixed type ' . $type
+                . '; initialize it with std::any() when reference semantics are required',
+        );
     }
 
 }

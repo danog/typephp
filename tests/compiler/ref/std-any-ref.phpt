@@ -17,7 +17,7 @@ function main(): void
         $value = 'changed';
     };
 
-    $value = 'variable';
+    $value = std::any('variable');
     $replace(StD::ReF($value));
     echo $value, "\n";
 

@@ -1,6 +1,5 @@
 <?php
 
-declare(strict_types=1);
 
 const STATIC_CACHE_ITERATIONS = 1_000_000;
 const STATIC_CACHE_WARMUPS = 2;

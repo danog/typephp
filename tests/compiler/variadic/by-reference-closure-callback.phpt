@@ -5,25 +5,28 @@ Reference Closure parameters work at Zend callback boundaries used by Symfony mb
 
 function convert_values(string $suffix, &...$vars): bool
 {
-    $ok = true;
-    array_walk_recursive($vars, static function (&$value, $key) use (&$ok, $suffix): void {
-        if (!is_string($value)) {
-            $ok = false;
-            return;
-        }
-        $value .= $suffix . ':' . $key;
-    });
+    $ok = std::any(true);
+    foreach ($vars as &$var) {
+        array_walk_recursive($var, static function (&$value, $key) use (&$ok, $suffix): void {
+            if (!is_string($value)) {
+                $ok = false;
+                return;
+            }
+            $value .= $suffix . ':' . $key;
+        });
+    }
+    unset($var);
     return $ok;
 }
 
 function main(): void
 {
-    $first = ['a' => 'one', 'nested' => ['b' => 'two']];
-    $second = 'three';
+    $first = std::any(['a' => 'one', 'nested' => ['b' => 'two']]);
+    $second = std::any('three');
     var_dump(convert_values('!', $first, $second));
     var_dump($first, $second);
 
-    $invalid = ['ok', 42];
+    $invalid = std::any(['ok', 42]);
     var_dump(convert_values('?', $invalid));
     var_dump($invalid);
 }

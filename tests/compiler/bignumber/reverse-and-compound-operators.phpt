@@ -2,7 +2,6 @@
 Big numeric reverse non-commutative and BigFloat compound operators
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $bi = std::bigInt(4);
     echo (10 - $bi)->toString(), "\n";

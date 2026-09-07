@@ -11,7 +11,7 @@ function predicted_condition(int &$calls, bool $result): bool
 
 function main(): void
 {
-    $calls = 0;
+    $calls = std::any(0);
 
     if (std::expected(predicted_condition($calls, true))) {
         echo "expected\n";

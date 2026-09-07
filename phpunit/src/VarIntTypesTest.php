@@ -75,7 +75,7 @@ final class VarIntTypesTest extends BaseTest
     {
         $this->expectException(TestError::class);
         $this->expectExceptionMessage(
-            'Cannot create a reference to native variable of type php::Bool; initialize it with std::any()',
+            'Cannot create a reference to variable $changed of fixed type php::Bool; initialize it with std::any()',
         );
 
         $this->compileSource(

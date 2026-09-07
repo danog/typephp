@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 function addToMaximum(int $value): int
 {

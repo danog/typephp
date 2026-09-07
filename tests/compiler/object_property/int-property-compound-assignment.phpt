@@ -2,7 +2,6 @@
 Typed int property compound assignments use PHP arithmetic and checked writes
 --FILE--
 <?php
-declare(strict_types=1);
 use varint_types;
 
 class IntCompoundBox

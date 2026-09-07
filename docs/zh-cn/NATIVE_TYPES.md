@@ -4,6 +4,14 @@
 
 **AOT 编译器支持 6 种原生/高精度类型**:
 
+从 TypePHP 0.8 起，推断出的 `int`、`float`、`bool` 局部变量默认分别使用
+`php::Int`、`php::Float`、`php::Bool` 原生存储。原有 `use native_types` 已移除，
+编译器也绝不会在后续流程中把原生局部变量静默提升为 `php::Var`。
+
+只有文件确实需要 Zend PHP 的整数扩展语义时才使用 `use varint_types`；它只装箱
+推断出的整数，不影响 float 和 bool。只有单个值需要动态或引用语义时，使用
+`std::any($value)`。
+
 ### 基础原生类型
 1. ✅ `std::int` - 原生整数类型 (zend_long, 8 字节)
 2. ✅ `std::float` - 原生浮点类型 (double, 8 字节)
@@ -24,7 +32,6 @@ AOT 编译器要求对象属性在整个生命周期内始终保持声明时的�
 
 ```php
 <?php
-use native_types;
 
 class User {
     public int $id = 0;
@@ -263,8 +270,6 @@ BigInt、Decimal、BigFloat 均继承自 `php::Box`，存储于 `php::Variant` �
 ### 声明与构造
 
 ```php
-use native_types;
-
 // 从整数字面量构造 BigInt
 $a = std::bigInt(100);
 $b = std::bigInt("123456789012345678901234567890");  // 超长整数字符串
@@ -496,11 +501,14 @@ BigFloat / Decimal / BigInt 参与
 
 ### 规则一：Var 主导
 
-当运算数中至少有一边是 `Var` 类型（非 `use native_types` 声明），两边均作为 `Var` 处理，使用 ZendVM 的 `add_function` / `div_function` 等运算函数，完全遵循 PHP 原生类型转换（type juggling）语义。
+当至少一个运算数为 `Var` 时，两边都进入 PHPX/Zend 算术路径，遵循 PHP 的类型
+转换语义。`Var` 可以来自 `std::any(...)`、动态运行时值，或声明了
+`use varint_types` 的文件中推断出的整数。
 
 ```php
+use varint_types;
 $a = 10;        // Var，存 int(10)
-$b = 2.5;       // Var，存 float(2.5)
+$b = 2.5;       // php::Float（varint_types 只影响推断整数）
 $c = $a + $b;   // 两边为 Var → ZendVM 运算 → float(12.5)
 ```
 
@@ -508,10 +516,10 @@ C++ 代码生成：`int64_t` 和 `double` 值通过 `php::Variant` 的模板构�
 
 ### 规则二：Float 优先于 Int
 
-当两边均为原生类型（通过 `use native_types` 或 `std::int()`/`std::float()` 声明），如果任一边是 Float，则两边均转为 Float 运算。仅当两边都是 Int 才使用整数运算。
+当两边均为原生类型（默认行为，或在 varint 文件中显式使用 `std::int()` /
+`std::float()`）时，Float 优先。仅当两边都是 Int 才使用整数运算。
 
 ```php
-use native_types;
 $a = 10;        // php::Int
 $b = 2.5;       // php::Float
 $c = $a + $b;   // Float + Float → double 加法
@@ -521,7 +529,9 @@ $e = 3;         // php::Int
 $f = $d + $e;   // Int + Int → int64_t 加法
 ```
 
-> **注意**：原生类型变量在运算中**不会改变自身类型**。如 `Int += Float` 在 C++ 中执行 `int64_t += double`，结果截断为 int64_t，与 PHP 行为不同（PHP 中变量会变为 float）。这是 `use native_types` 有意为之的语义。
+> **注意**：原生变量在运算中**不会改变存储类型**。例如 `Int += Float` 的结果仍是
+> Int。这种固定类型行为现在是默认规则；需要动态整数扩展时应显式选择
+> `use varint_types` 或 `std::any()`。
 
 ### 规则三：高精度类型的安全提升
 
@@ -560,15 +570,15 @@ $f = $d + $e;   // Int + Int → int64_t 加法
 `+=`、`-=`、`*=`、`/=`、`%=` 等复合赋值运算符遵循相同的类型提升规则，但 RHS 会被转换为 LHS 变量的类型。若 LHS 为 Var，RHS 保持原类型（Var 的 `operator+=` 接管）；若 LHS 为原生类型，RHS 显式转换为该类型。
 
 ```php
-$a = 10;        // Var
+use varint_types;
+$a = 10;        // 该文件启用 varint_types，因此为 Var
 $a += 2.5;      // Var::operator+=(float) → ZendVM → $a 变为 float(12.5)
 
-use native_types;
-$b = 10;        // php::Int
+$b = std::int(10); // varint_types 文件中显式声明 php::Int
 $b += 2.5;      // int64_t += double → C++ 隐式截断 → $b = 12 (Int)
 ```
 
 ---
 
-**最后更新**: 2026 年 5 月 26 日  
-**适用版本**: PHP AOT Compiler v1.x
+**最后更新**: 2026 年 9 月 6 日
+**适用版本**: TypePHP 0.8+

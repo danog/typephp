@@ -37,7 +37,7 @@ class RefChild extends RefTarget
 
 function main(): void
 {
-    $value = 'start';
+    $value = std::any('start');
     mutate_arg($value);
     $target = new RefTarget($value);
     $target->mutate($value);

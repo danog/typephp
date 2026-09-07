@@ -25,14 +25,14 @@ class DynamicReferenceMutator
 function main(): void
 {
     $function = 'dynamic_increment';
-    $number = 40;
+    $number = std::any(40);
     $function(std::ref($number));
     var_dump($number);
 
     $mutator = new DynamicReferenceMutator();
     $method = [$mutator, 'suffix'];
-    $first = 'one';
-    $second = 'two';
+    $first = std::any('one');
+    $second = std::any('two');
     $method('!', std::ref($first), std::ref($second));
     var_dump($first, $second);
 

@@ -1,6 +1,5 @@
 <?php
 
-declare(strict_types=1);
 
 const DYNAMIC_CALL_ITERATIONS = 1_000_000;
 const DYNAMIC_CALL_ROUNDS = 5;

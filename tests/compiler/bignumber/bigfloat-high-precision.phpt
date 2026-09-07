@@ -2,7 +2,6 @@
 BigFloat arithmetic retains precision beyond IEEE double
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $large = std::bigFloat("1000000000000000000000000000000");
     $one = std::bigFloat("1");

@@ -2,7 +2,6 @@
 BigInt literal parsing and output
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $a = 12345678901234567890;
     echo $a->toString();

@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 /*
  * This file is derived from build/gen_stub.php in php-src and is not

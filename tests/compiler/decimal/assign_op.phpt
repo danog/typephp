@@ -2,7 +2,6 @@
 Decimal compound assignment operators (+=, -=, *=, /=, %=)
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     // Decimal +=
     $a = std::decimal("100.50");

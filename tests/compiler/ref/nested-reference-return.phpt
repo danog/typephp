@@ -25,10 +25,10 @@ function &object_property_ref(NestedReferenceBox $box): mixed
 
 function main(): void
 {
-    $values = [
+    $values = std::any([
         'item' => 'before',
         'outer' => ['inner' => 'nested-before'],
-    ];
+    ]);
 
     $item =& array_element_ref($values);
     $item = 'after';

@@ -66,7 +66,7 @@ These items should be documented with the exact boundary.
 | Binary mode requires global `main()` | Intentional Rule | This defines the binary entry ABI. |
 | `main()` only accepts no parameters or `(int $argc, array $argv)` | Intentional Rule | Keeps the entry ABI explicit and stable. |
 | `main()` must return `void` | Intentional Rule | An integer exit-code convention could be added later, but current TypePHP rules reject return values. |
-| `declare(strict_types=...)` only supports `strict_types=1` | Intentional Rule | Supporting mixed strict/weak typing is possible, but TypePHP keeps strict behavior predictable. |
+| TypePHP is always strict; `strict_types=0` is rejected | Intentional Rule | Per-file weak typing conflicts with TypePHP's fixed storage and static type guarantees. `strict_types=1` remains accepted as a redundant compatibility directive. |
 | Default parameter before required parameter | Intentional Rule | PHP allows this legacy pattern but ignores the default. TypePHP rejects it to avoid misleading declarations. |
 | Child class overriding parent private property | Intentional Rule / Pending if dynamicized | PHP stores private properties by declaring class. TypePHP native/fixed layouts make this expensive. Rejecting it keeps property layout predictable. |
 | `__construct()` return value | Intentional Rule | PHP constructors should not return values. TypePHP rejects this explicitly. |

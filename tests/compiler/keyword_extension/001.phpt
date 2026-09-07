@@ -2,7 +2,6 @@
 Keyword MethodsFor method with snake_case name
 --FILE--
 <?php
-declare(strict_types=1);
 #[MethodsFor('*')]
 final class KeywordExtensions
 {

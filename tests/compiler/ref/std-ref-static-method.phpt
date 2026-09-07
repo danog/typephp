@@ -7,7 +7,7 @@ function reference_test(&$name) {
 }
 function main()
 {
-    $name = 'php ';
+    $name = std::any('php ');
     reference_test(std::ref($name));
     echo $name;
 }

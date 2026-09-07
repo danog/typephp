@@ -265,9 +265,4 @@ trait ForeachTrait
         return $code;
     }
 
-    /**
-     * For backward compatibility, native types are not used by default; integers and floats are treated as php variables.
-     * Native int/float/bool types do not support automatic conversion. For example, an int computation that exceeds its maximum value is promoted to float, and a division that does not divide evenly becomes float.
-     * In some cases high-performance computation may need native types; use `$a = std::int(0)` to explicitly opt into native types.
-     */
 }

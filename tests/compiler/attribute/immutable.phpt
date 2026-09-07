@@ -118,7 +118,8 @@ function main(): void
     echo $user->traitName(), PHP_EOL;
     echo sumImmutable([2, 3]), PHP_EOL;
     echo cloneImmutable($user), PHP_EOL;
-    echo inspectImmutableReference($user), PHP_EOL;
+    $referenceUser = std::any($user);
+    echo inspectImmutableReference($referenceUser), PHP_EOL;
     echo deliberatelyEscapeImmutableCheck($user), PHP_EOL;
     echo (new ImmutableHookedValue())->read(), PHP_EOL;
     echo closureImmutableParameter($user), PHP_EOL;

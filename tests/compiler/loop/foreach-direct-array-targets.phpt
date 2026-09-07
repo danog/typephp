@@ -35,7 +35,7 @@ function main(): void
     var_dump(valuesOnly([10, 20]));
     var_dump(sameTarget([7 => 'last-value']));
 
-    $source = 10;
+    $source = std::any(10);
     $values = [&$source];
     foreach ($values as $value) {
         $value = 99;

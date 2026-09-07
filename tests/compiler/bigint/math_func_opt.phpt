@@ -2,7 +2,6 @@
 Big* types: math function optimization (abs/pow/sqrt/floor/ceil/round)
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     // BigInt
     $a = std::bigInt("100");

@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 function main(): void
 {
     $integer = std::bigInt("123456789012345678901234567890");

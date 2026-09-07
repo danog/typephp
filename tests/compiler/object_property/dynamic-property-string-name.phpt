@@ -31,7 +31,7 @@ function writeName(DynamicNameBag $bag, mixed $name, mixed $value): void
 function main(): void
 {
     $bag = new DynamicNameBag();
-    $name = 'answer';
+    $name = std::any('answer');
     writeName($bag, $name, 42);
     var_dump(readName($bag, $name));
 

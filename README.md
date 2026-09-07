@@ -127,9 +127,11 @@ This two-phase design keeps multi-file and self-hosted builds deterministic.
   executable and does not require the PHP CLI or a separate interpreter
   process. The executable still embeds/links PHPX, `libphp`, and any configured
   native libraries, which must be available in the deployment package.
-- **Gradual typing that actually pays off.** Add `use native_types`, `std::`
-  containers, and type declarations only where performance matters; the rest
-  stays ordinary PHP.
+- **Strong scalar types by default.** Inferred `int`, `float`, and `bool`
+  locals use native C++ storage. Use `std::any()` for an individual dynamic
+  value, or `use varint_types` when a file requires PHP integer widening.
+- **Always-strict calls.** TypePHP never enables PHP's weak scalar coercion;
+  `declare(strict_types=1)` is unnecessary.
 - **Zend ecosystem interop.** Extension mode loads as a standard PHP extension,
   and projects can call supported internal functions and require other Zend
   extensions explicitly.
@@ -331,8 +333,10 @@ ahead-of-time compilation, but it also makes several deliberate restrictions:
 - global scope is declaration-only; executable statements must be inside a
   function or method;
 - binary mode has a strict `main()` signature;
-- `use native_types` opts scalar declarations into fixed native storage, so a
-  value cannot later change to an incompatible type;
+- inferred `int`, `float`, and `bool` values use fixed native storage by
+  default and cannot later change to an incompatible type;
+- `use varint_types` stores inferred integers in `php::Var` for PHP-compatible
+  overflow and division behavior; `std::any()` erases one expression's type;
 - statically-known calls and properties are compiled directly, while supported
   dynamic operations use PHPX/Zend runtime fallbacks;
 - `.stub.php` files declare C++ or imported-library APIs and must contain empty
@@ -405,7 +409,6 @@ inherited final method is a compile-time error.
 
 ```php
 <?php
-use native_types;
 
 function fib(int $n): int
 {
@@ -429,15 +432,15 @@ bin/tpc.php fib.php -O3 -o fib
 ./fib 30
 ```
 
-With `use native_types`, `int` variables become C++ `int64_t` and arithmetic
-compiles to plain CPU instructions instead of ZendVM calls.
+By default, inferred and declared `int` variables become C++ `int64_t`, and
+arithmetic compiles to plain CPU instructions instead of ZendVM calls. Add
+`use varint_types` only when a file requires PHP's overflow-to-float and
+non-integral integer-division behavior.
 
 ### 2. High-precision numerics
 
 ```php
 <?php
-declare(strict_types=1);
-use native_types;
 
 function main(): void
 {
@@ -464,7 +467,6 @@ See [High-precision types](docs/en/HIGH_PRECISION_TYPES.md) and
 
 ```php
 <?php
-use native_types;
 
 function main(): void
 {

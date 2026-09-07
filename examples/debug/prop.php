@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 class Data {
     public int $value = 0;
     public bool $bv = true;

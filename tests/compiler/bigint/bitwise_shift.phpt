@@ -2,7 +2,6 @@
 BigInt bitwise shift operations (<<, >>, <<=, >>=, bitShiftLeft, bitShiftRight)
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $a = std::bigInt("16");  // 0b10000
 

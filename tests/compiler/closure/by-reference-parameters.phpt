@@ -8,7 +8,7 @@ function main(): void
     $fixed = static function (&$value): void {
         $value .= '!';
     };
-    $text = 'fixed';
+    $text = std::any('fixed');
     $fixed(std::ref($text));
     var_dump($text);
 
@@ -19,7 +19,7 @@ function main(): void
     $optional();
 
     $arrow = static fn (&$value): int => ++$value;
-    $number = 40;
+    $number = std::any(40);
     var_dump($arrow(std::ref($number)), $number);
 
     $typed = static function (int &$value): void {

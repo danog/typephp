@@ -32,13 +32,13 @@ function test2(&$test)
 
 function main()
 {
-    $test = new Test();
+    $test = std::any(new Test());
     $testOrigin = $test;
     test1($test);
     var_dump($test !== $testOrigin);
     var_dump($testOrigin->value, $test->value);
 
-    $test = new Test();
+    $test = std::any(new Test());
     $testOrigin = $test;
     test2($test);
     var_dump($test !== $testOrigin);

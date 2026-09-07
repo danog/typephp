@@ -3260,7 +3260,7 @@ CODE;
                 }
             } elseif ($key === 'strict_types') {
                 if (!($declare->value instanceof Node\Scalar\Int_) or $declare->value->value !== 1) {
-                    $this->fatalError($v, 'declare(strict_types=0) is not allowed, only strict_types=1 is supported');
+                    $this->fatalError($v, 'TypePHP always uses strict types; declare(strict_types=0) is not allowed');
                 }
             } else {
                 $this->fatalError($v, 'declare(' . $key . '=' . $value . ') is not supported');

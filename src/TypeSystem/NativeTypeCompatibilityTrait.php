@@ -265,7 +265,7 @@ trait NativeTypeCompatibilityTrait
 
         if (($type === Type::VAR || $type === Type::REF) && $this->isStrictScalarType($argInfo->type)) {
             // A native scalar ABI value has already lost its zval type. Preserve
-            // the dynamic value until strict_types validation has completed.
+            // the dynamic value until TypePHP's strict validation has completed.
             // The PHPX helper evaluates the expression exactly once and returns
             // the final native ABI type without an immediately-invoked closure.
             $this->checkVarAssignExpr($arg, $argInfo->type, $type);

@@ -2,7 +2,6 @@
 Literal zero divisors compile and raise catchable DivisionByZeroError at runtime
 --FILE--
 <?php
-declare(strict_types=1);
 
 function main(): void
 {

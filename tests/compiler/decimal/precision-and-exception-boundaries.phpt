@@ -2,7 +2,6 @@
 Decimal keeps 50 digits and translates native arithmetic errors
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $large = std::decimal("1234567890123456789012345678901234567890123456789");
     echo ($large + 1)->toString(), "\n";

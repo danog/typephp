@@ -2,7 +2,6 @@
 BigInt binary operators (+, -, *, /, %) and unary minus
 --FILE--
 <?php
-declare(strict_types=1);
 function main(): void {
     $a = std::bigInt(100);
 

@@ -2391,21 +2391,7 @@ class CompilerBase implements PropertyAccessContext
                 if (!$this->hasVar($name)) {
                     $this->errorUndefinedVariable($v->expr);
                 }
-                if ($this->hasLocalVar($name) && $this->getVarType($name) !== Type::VAR && $this->getVarType($name) !== Type::REF) {
-                    $isParameter = false;
-                    foreach ($this->functionDef->argInfoList as $argInfo) {
-                        if ($argInfo->name === $name) {
-                            $isParameter = true;
-                            break;
-                        }
-                    }
-                    if ($isParameter) {
-                        $this->fatalError($v, 'A function returning by reference cannot return a native typed parameter');
-                    }
-                    // The declaration is emitted after parsing the body, so a local can
-                    // be promoted to Variant before C++ is generated.
-                    $this->context->localVars[$name] = Type::VAR;
-                }
+                $this->assertVariableReferenceStorage($v->expr, $v, $name);
                 return 'return ' . $name . '.toReference();';
             }
             if ($this->isPropertyFetch($v->expr)) {
@@ -4398,6 +4384,7 @@ class CompilerBase implements PropertyAccessContext
         if ($op === self::OP_REFVAL) {
             $this->assertNativeArrayAccessReferenceForbidden($node);
             $this->assertNativeObjectReferenceForbidden($node, $node);
+            $this->assertVariableReferenceStorage($node, $node);
         }
         if ($node instanceof Expr\ArrayDimFetch
             && $this->isNativeObjectClass($this->detectClassOfExpr($node->var))

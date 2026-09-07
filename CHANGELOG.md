@@ -2,6 +2,39 @@
 
 ## 0.8.0
 
+### Breaking: native scalar storage is now the default
+
+`use native_types` has been removed. Inferred `int`, `float`, and `bool`
+locals now use `php::Int`, `php::Float`, and `php::Bool` by default. Their
+storage type is fixed and the compiler never promotes one of these locals to
+`php::Var` merely because a later operation needs dynamic PHP semantics.
+
+Two explicit escape hatches remain:
+
+- `use varint_types` is a file-level mode that stores inferred integer values
+  in `php::Var`, preserving PHP's overflow-to-float, non-integral division,
+  and other Zend integer arithmetic behavior. It does not box `float` or
+  `bool` locals.
+- `std::any($value)` erases the static type of that individual expression, so
+  a variable initialized from it uses `php::Var` and may participate in PHP
+  reference or dynamic-value operations.
+
+For example, `$i = 100` is now permanently an integer local. Reusing `$i` as a
+`foreach` key is rejected because PHP keys have type `int|string`; write
+`$i = std::any(100)` or select `use varint_types` if this reuse is intentional.
+Projects must remove `use native_types` and add the new compatibility mode only
+to files that genuinely depend on Zend integer widening semantics.
+
+Fixed-storage locals can no longer be converted to PHP references. This rule
+applies to native scalars, strings, arrays, objects, streams, high-precision
+values, and `std` containers. Zend references are untyped, so allowing one to
+alias fixed C++ storage could corrupt the variable's type. Use `std::any()`
+before reference operations and explicitly convert the result back afterward.
+
+TypePHP is always strict. Project sources no longer need
+`declare(strict_types=1)`; the directive remains accepted as a redundant PHP
+compatibility declaration, while `strict_types=0` is rejected.
+
 ### Breaking: compile-time API namespace cleanup
 
 TypePHP compile-time APIs now occupy only two global class symbols:
@@ -44,6 +77,32 @@ should review the change log and run their full test suite before upgrading.
 ---
 
 ## 0.8.0（中文）
+
+### 破坏性变更：默认使用原生标量存储
+
+`use native_types` 已移除。推断出的 `int`、`float`、`bool` 局部变量现在默认分别
+使用 `php::Int`、`php::Float`、`php::Bool`。这些变量的存储类型一旦确定便不会因为
+后续操作需要 PHP 动态语义而被编译器自动提升为 `php::Var`。
+
+只保留两个显式出口：
+
+- `use varint_types` 是文件级模式，使推断出的整数使用 `php::Var`，保留 PHP 的
+  整数溢出转浮点、整数除法产生非整数结果等 Zend 算术语义；它不会装箱 `float`
+  或 `bool`。
+- `std::any($value)` 只擦除该表达式的静态类型。以它初始化的变量使用 `php::Var`，
+  可参与引用或其他动态值操作。
+
+例如 `$i = 100` 现在固定为整数局部变量。由于 PHP 的 foreach key 类型为
+`int|string`，之后复用 `$i` 作为 key 会在编译期报错；确需复用时，应写成
+`$i = std::any(100)` 或在文件中声明 `use varint_types`。升级项目必须删除
+`use native_types`，并且只为真正依赖 Zend 整数扩展语义的文件添加新兼容模式。
+
+固定存储的局部变量不再允许转换为 PHP 引用，包括原生标量、字符串、数组、对象、
+stream、高精度值和 `std` 容器。Zend 引用没有类型约束，若允许其指向固定 C++ 存储，
+可能破坏变量类型。需要引用操作时先使用 `std::any()`，操作完成后再显式转换回目标类型。
+
+TypePHP 始终使用严格类型，项目源码不再需要 `declare(strict_types=1)`。该声明仍作为
+冗余的 PHP 兼容语法被接受，而 `strict_types=0` 会被拒绝。
 
 ### 破坏性变更：整理编译期 API 命名空间
 
