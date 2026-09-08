@@ -1090,19 +1090,23 @@ trait PropertyAccessTrait
                 if ($this->isNativeObjectVar($name)) {
                     $this->forgetNativeObjectNonNull($name);
                     $lines[] = "{$name} = nullptr;";
-                } elseif ($this->isNativeType($type)) {
-                    $this->warning($var, "Variable of native type `\${$name}` cannot be unset");
+                } elseif ($type === Type::STR || $type === Type::ARRAY) {
+                    // String and Array reset to Zend's immutable empty
+                    // singletons. This releases the previous value without
+                    // allocating a replacement that will usually stay empty.
+                    $lines[] = "{$name}.unset();";
+                } elseif (($defaultValue = Type::getDefaultValueExpression($type)) !== null) {
+                    // A fixed value type must preserve its storage invariant.
+                    // unset() releases the previous value and restores the
+                    // type's initial state instead of introducing UNDEF.
+                    $lines[] = "{$name} = {$defaultValue};";
                 } elseif ($type === Type::OBJECT) {
-                    // A PHP local read after unset() evaluates to null (and may
-                    // emit an undefined-variable warning). Keep the Object
-                    // wrapper so later object assignments remain valid, but
-                    // store NULL rather than IS_UNDEF so strict null checks
-                    // retain PHP value semantics.
-                    //
-                    // Keep the declared class: unset() changes only the value
-                    // state and does not make null or another class assignable.
+                    // Objects have no empty object value. Null is their valid
+                    // initial state; keep the declared class constraint so a
+                    // later assignment must still contain a compatible object.
                     $lines[] = "{$name} = php::null;";
                 } else {
+                    // Dynamic storage retains PHP's true undefined state.
                     $lines[] = "{$name}.unset();";
                 }
             } else {

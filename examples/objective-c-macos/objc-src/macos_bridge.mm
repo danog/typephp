@@ -147,7 +147,10 @@ php::Int php_ui_add_button(
             static_cast<CGFloat>(y),
             static_cast<CGFloat>(width),
             static_cast<CGFloat>(height));
-        button.bezelStyle = NSBezelStyleRounded;
+        // macOS 11+: keep the automatic button style. Forcing the legacy
+        // NSBezelStyleRounded disables the accent fill that the primary button
+        // needs behind its white title. The automatic style also makes
+        // bezelColor render as a proper filled button.
         button.controlSize = NSControlSizeLarge;
         button.font = [NSFont systemFontOfSize:14 weight:NSFontWeightSemibold];
         if (style == 1) {
@@ -165,8 +168,17 @@ void php_ui_set_control_text(php::Int controlId, php::Str text)
 {
     @autoreleasepool {
         NSControl *control = bridge.controls[@(static_cast<NSInteger>(controlId))];
-        if (control != nil) {
-            control.stringValue = to_ns_string(text);
+        if (control == nil) {
+            return;
+        }
+        NSString *value = to_ns_string(text);
+        if ([control isKindOfClass:NSButton.class]) {
+            // Update the title through the NSButton property. System-style
+            // buttons (macOS 11+) draw from their attributed title; assigning
+            // only the raw cell stringValue can leave the button blank.
+            ((NSButton *)control).title = value;
+        } else {
+            control.stringValue = value;
         }
     }
 }

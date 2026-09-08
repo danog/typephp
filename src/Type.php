@@ -70,4 +70,23 @@ final class Type
             default => $type,
         };
     }
+
+    /**
+     * Return the C++ expression for the initial state of a fixed value type.
+     *
+     * Fixed TypePHP storage never becomes UNDEF: unset() releases the current
+     * value and restores this state instead. Objects are handled separately
+     * because null is their valid empty state rather than a value-type default.
+     */
+    public static function getDefaultValueExpression(string $type): ?string
+    {
+        return match ($type) {
+            self::INT => '0',
+            self::FLOAT => '0.0',
+            self::BOOL => 'false',
+            self::STR => self::STR . '()',
+            self::ARRAY => self::ARRAY . '{}',
+            default => null,
+        };
+    }
 }
