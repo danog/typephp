@@ -217,15 +217,19 @@ trait FunctionCallTrait
     }
 
     /**
-     * Erase the static type of a value through std::any().
+     * Erase the static type of a value through std::any(). An omitted value
+     * explicitly creates dynamic storage initialized to null.
      */
     protected function parseAnyCompileTimeCall(CallLike $expr): string
     {
+        if (count($expr->args) === 0) {
+            return self::VALUE_NULL;
+        }
         if (count($expr->args) !== 1
             || !$expr->args[0] instanceof Node\Arg
             || $expr->args[0]->unpack
         ) {
-            $this->fatalError($expr, 'The std::any function expects exactly one non-unpacked argument');
+            $this->fatalError($expr, 'The std::any function expects zero or one non-unpacked argument');
         }
         $value = $expr->args[0]->value;
         if ($this->isNativeObjectClass($this->detectClassOfExpr($value))) {

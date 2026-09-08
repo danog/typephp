@@ -48,7 +48,7 @@ TypePHP 不再为编译器指令保留任何全局函数名。编译期 API 最�
 | `std::bigInt($value)` | 构造 BigInt。 | 不允许从 float 变量隐式构造。 |
 | `std::decimal($value)` | 构造 Decimal。 | float 变量需改用字符串或整型；float 字面量会按原始字面量处理。 |
 | `std::bigFloat($value)` | 构造 BigFloat。 | 需要 1 个值参数。 |
-| `std::any($value)` | 将表达式降级为 `mixed/any`。 | Native 对象及包含 Native 对象的 std 容器不能通过它逃逸。 |
+| `std::any([$value])` | 将表达式降级为 `mixed/any`；省略参数时，初始值为 `null`。 | Native 对象及包含 Native 对象的 std 容器不能通过它逃逸。 |
 | `std::ref($target)` | 显式以引用方式传递目标。 | 只接受变量、数组元素或对象属性，且仅可作为调用参数的引用包装器。 |
 | `std::expected($condition)` | 标记条件通常为真。 | 只接受一个非展开参数并返回 bool。 |
 | `std::unexpected($condition)` | 标记条件通常为假。 | 只接受一个非展开参数并返回 bool。 |

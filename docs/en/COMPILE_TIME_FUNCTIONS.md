@@ -50,7 +50,7 @@ There are currently 14 `std::` compile-time entry points.
 | `std::bigInt($value)` | Constructs a BigInt. | Implicit construction from a float variable is not allowed. |
 | `std::decimal($value)` | Constructs a Decimal. | A float variable must be converted via string or integer; float literals are handled per the original literal. |
 | `std::bigFloat($value)` | Constructs a BigFloat. | Requires 1 value parameter. |
-| `std::any($value)` | Degrades the expression to `mixed/any`. | Native objects and native-object std containers cannot escape through it. |
+| `std::any([$value])` | Degrades the expression to `mixed/any`; when omitted, the value defaults to `null`. | Native objects and native-object std containers cannot escape through it. |
 | `std::ref($target)` | Explicitly passes a target by reference. | Only accepts variables, array elements, or object properties and is only valid as a call argument wrapper. |
 | `std::expected($condition)` | Marks a condition as usually true. | Accepts exactly one non-unpacked argument and returns bool. |
 | `std::unexpected($condition)` | Marks a condition as usually false. | Accepts exactly one non-unpacked argument and returns bool. |
