@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use TypePhp\CompilerTest;
 use TypePhp\Exception\TestError;
 use TypePhp\Platform\Ios;
+use TypePhp\Platform\Android;
 use TypePhp\Platform\Linux;
 use TypePhp\Platform\Macos;
 use TypePhp\Platform\PlatformBase;
@@ -112,6 +113,44 @@ final class NativeBuildConfigurationTest extends TestCase
             $restorePhp();
             $restorePhpx();
         }
+    }
+
+    public function testAndroidResolvesSelfContainedSdkAndSystemLibraries(): void
+    {
+        $phpxDir = $this->temporaryDirectory('phpx-android-host');
+        $androidSdk = $this->temporaryDirectory('phpx-android-sdk');
+        mkdir($androidSdk . '/lib', 0777, true);
+        mkdir($androidSdk . '/include/phpx', 0777, true);
+        file_put_contents(
+            $androidSdk . '/.typephp-android-sdk-abi',
+            "typephp-android-arm64-v8a-api24-phpx-sdk-abi-v1\n",
+        );
+        $phpxArchive = $androidSdk . '/lib/libphpx.a';
+        $phpArchive = $androidSdk . '/lib/libphp.a';
+        touch($phpxArchive);
+        touch($phpArchive);
+
+        $restorePhpx = $this->withEnvironment('PHPX_HOME', $phpxDir);
+        $restoreSdk = $this->withEnvironment('PHPX_ANDROID_SDK_DIR', $androidSdk);
+        try {
+            $compiler = $this->newCompiler(new Android());
+            self::assertSame($phpxArchive, $compiler->findPhpxLibraryForTest());
+            self::assertSame($androidSdk, $compiler->getPhpDir());
+            self::assertSame([$androidSdk . '/lib'], $compiler->getLibraryPathsForTest());
+            self::assertSame($androidSdk . '/include/phpx', $compiler->getIncludePathsForTest()[0]);
+            self::assertSame(
+                [$phpxArchive, $phpArchive, 'log', 'android', 'dl', 'm'],
+                $compiler->getLibrariesForTest(),
+            );
+            self::assertContains('PHPX_ANDROID=1', $compiler->getCommonCompileOptionsForTest()['user_defines']);
+        } finally {
+            $restoreSdk();
+            $restorePhpx();
+        }
+
+        self::assertTrue(Android::supportsTarget('aarch64-linux-android24'));
+        self::assertFalse(Android::supportsTarget('x86_64-linux-android24'));
+        self::assertSame(24, Android::getApiLevel('aarch64-linux-android24'));
     }
 
     public function testNativeModulesDoNotFallBackToStaticPhpx(): void

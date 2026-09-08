@@ -44,6 +44,7 @@ use TypePhp\Generator\Symbol;
 use TypePhp\Metadata\Constants;
 use TypePhp\Platform\PlatformFactory;
 use TypePhp\Platform\Ios;
+use TypePhp\Platform\Android;
 use TypePhp\Platform\Wasi;
 use TypePhp\Platform\Windows;
 use TypePhp\Resolver\Reflection;
@@ -220,6 +221,8 @@ class Translator extends Preprocessor
                     throw new \RuntimeException('The iOS target requires a macOS build host with Xcode');
                 }
                 $this->platform = new Ios();
+            } elseif (Android::supportsTarget($targetPlatform)) {
+                $this->platform = new Android();
             } elseif ($targetPlatform === 'wasm32-wasip2' || $targetPlatform === 'wasm32-unknown-wasip2') {
                 $detectedTarget = getenv('TYPEPHP_WASI_TARGET');
                 $this->platform = new Wasi(
@@ -2871,6 +2874,11 @@ CODE;
                     $this->error('The iOS target requires a macOS build host with Xcode');
                 }
                 $this->platform = new Ios();
+                $this->compilerBackend = null;
+                $this->cppCompiler = $this->platform->getDefaultCompiler();
+                $this->initializeNewArchitecture();
+            } elseif (Android::supportsTarget($this->targetPlatform)) {
+                $this->platform = new Android();
                 $this->compilerBackend = null;
                 $this->cppCompiler = $this->platform->getDefaultCompiler();
                 $this->initializeNewArchitecture();

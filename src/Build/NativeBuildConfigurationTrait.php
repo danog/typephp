@@ -44,7 +44,10 @@ trait NativeBuildConfigurationTrait
             return $fullStaticSdk;
         }
 
-        return $this->isIosTarget() ? $this->getIosSdkDir() : null;
+        if ($this->isIosTarget()) {
+            return $this->getIosSdkDir();
+        }
+        return $this->isAndroidTarget() ? $this->getAndroidSdkDir() : null;
     }
 
     protected function getIosSdkDir(): string
@@ -63,6 +66,30 @@ trait NativeBuildConfigurationTrait
             $this->error(
                 'The iPhoneOS SDK is missing or ABI-incompatible: ' . $sdkDir . "\n"
                 . '  Rebuild it with PHPX ios/build.sh and the matching PHP SDK.'
+            );
+        }
+        return $sdkDir;
+    }
+
+    protected function getAndroidSdkDir(): string
+    {
+        $configured = getenv('PHPX_ANDROID_SDK_DIR');
+        $sdkDir = is_string($configured) && $configured !== ''
+            ? rtrim($configured, '/\\')
+            : $this->getPhpxDir() . '/android/arm64-v8a';
+        if (!is_dir($sdkDir)) {
+            $this->error(
+                'The Android SDK was not found at: ' . $sdkDir . "\n"
+                . '  Build it with PHPX sdk/build-native.sh or set PHPX_ANDROID_SDK_DIR.'
+            );
+        }
+        $api = \TypePhp\Platform\Android::getApiLevel($this->targetPlatform);
+        $expected = "typephp-android-arm64-v8a-api{$api}-phpx-sdk-abi-v1";
+        $abiStamp = $sdkDir . '/.typephp-android-sdk-abi';
+        if (!is_file($abiStamp) || trim((string) file_get_contents($abiStamp)) !== $expected) {
+            $this->error(
+                'The Android SDK is missing or ABI-incompatible: ' . $sdkDir . "\n"
+                . '  Rebuild it with the matching Android PHP Runtime Layer and NDK.'
             );
         }
         return $sdkDir;
@@ -231,6 +258,12 @@ trait NativeBuildConfigurationTrait
             $libraries[] = 'mpfr.lib';
             $libraries[] = 'libmpdec-4.0.1.dll.lib';
             $libraries[] = 'libmpdec++-4.0.1.dll.lib';
+        } elseif ($this->isAndroidTarget()) {
+            $libraries[] = $this->getAndroidSdkDir() . '/lib/libphp.a';
+            $libraries[] = 'log';
+            $libraries[] = 'android';
+            $libraries[] = 'dl';
+            $libraries[] = 'm';
         } else {
             // Unix PHP extensions resolve Zend/PHP symbols from the host SAPI.
             // Linking libphp.so here would load a second ZendVM and give PHPX a
@@ -281,7 +314,7 @@ trait NativeBuildConfigurationTrait
         // PHPX_HOME/lib where host libraries are installed. Keeping libphp.a
         // and libphpx.a in the same prefix also prevents a host macOS archive
         // from being selected accidentally during an iOS link.
-        if ($this->isIosTarget()) {
+        if ($this->isIosTarget() || $this->isAndroidTarget()) {
             $phpxStaticPath = $this->getPhpDir() . '/lib/libphpx.a';
             return is_file($phpxStaticPath) ? $phpxStaticPath : null;
         }
@@ -318,6 +351,9 @@ trait NativeBuildConfigurationTrait
         } elseif ($this->isIosTarget()) {
             $expected = $this->getPhpDir() . '/lib/libphpx.a';
             $buildHint = 'Build the integrated iPhoneOS SDK in PHPX_HOME/ios/iphoneos-arm64';
+        } elseif ($this->isAndroidTarget()) {
+            $expected = $this->getAndroidSdkDir() . '/lib/libphpx.a';
+            $buildHint = 'Build the Android SDK with PHPX sdk/build-native.sh';
         } else {
             $sharedLibExt = ltrim($platform->getSharedLibraryExtension(), '.');
             $expected = $this->getPhpxDir() . '/lib/libphpx.' . $sharedLibExt;

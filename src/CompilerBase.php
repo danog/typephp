@@ -68,6 +68,7 @@ use TypePhp\Parser\UniversalMethodCall;
 use TypePhp\Optimizer\FuncCallOptimizer;
 use TypePhp\Platform\Linux;
 use TypePhp\Platform\Ios;
+use TypePhp\Platform\Android;
 use TypePhp\Platform\Macos;
 use TypePhp\Platform\PlatformBase;
 use TypePhp\Platform\PlatformFactory;
@@ -685,6 +686,11 @@ class CompilerBase implements PropertyAccessContext
         return $this->getPlatform() instanceof Ios;
     }
 
+    public function isAndroidTarget(): bool
+    {
+        return $this->getPlatform() instanceof Android;
+    }
+
     public function isWasiTarget(): bool
     {
         $target = strtolower($this->targetPlatform);
@@ -734,6 +740,9 @@ class CompilerBase implements PropertyAccessContext
             // iPhoneOS is a cross target. Its PHP headers and archive are part
             // of the integrated PHPX SDK, never the host PHP installation.
             return $this->getIosSdkDir();
+        }
+        if ($this->isAndroidTarget()) {
+            return $this->getAndroidSdkDir();
         }
 
         try {
