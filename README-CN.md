@@ -86,8 +86,9 @@ AST，待全部项目符号就绪后再在 convert 阶段解析。这一两阶�
   `#[Printer]` 和 `#[Arrayable]` 根据属性声明生成类型安全的方法。
 - **现代 PHP 支持** —— PHP 8.4 property hooks、非对称可见性、PHP 8.5
   `clone()`-with 以及 `(void)` 丢弃表达式。
-- **跨平台与 WASM** —— 面向 x64 和 ARM64 的 Linux、Windows、macOS 目标，
-  以及 WASI 0.2 和浏览器（Jco）输出。
+- **跨平台、移动原生与 WASM** —— 面向 x64 和 ARM64 的 Linux、Windows、macOS
+  目标，使用 Android NDK 和 iOS SDK 开发 Android/iOS 原生应用，以及生成 WASI 0.2
+  和浏览器（Jco）输出。
 - **Python 桥接** —— 为 Python 模块生成 IDE helper，并将 Python 脚本转换为 TypePHP。
 
 ## 为什么选择 TypePHP？
@@ -141,9 +142,12 @@ sudo pacman -S base-devel cmake pkgconf gmp mpfr
 > GMP 用于 `bigInt`，MPFR 用于 `bigFloat`。`decimal` 底层是 libmpdec，
 > 已随 PHPX 内置，无需单独安装。
 
-Linux x64 是主要开发及全量测试 CI 平台。编译器也提供 Windows、macOS、ARM64 和
-WASI 后端；具体主机能否构建某个目标，仍取决于 PHP embed、工具链和第三方库是否
-可用。
+Linux x64 是主要开发及全量测试 CI 平台。编译器也提供 Windows、macOS、ARM64、
+Android `arm64-v8a`、iPhoneOS `arm64` 和 WASI 后端；具体主机能否构建某个目标，
+仍取决于 PHP embed、平台 SDK、工具链和第三方库是否可用。移动端可以将界面结构、
+应用状态和业务逻辑编写为 TypePHP，仅使用轻量的平台原生 UI 桥接，参见
+[Android 原生应用示例](examples/android-native/)和
+[iOS/macOS 原生应用示例](examples/apple-native/)。
 
 原生 Release Assets 默认使用 PHP 8.5 ZTS 的最新版本构建，提供 Linux x64、Linux
 ARM64、macOS ARM64 和 Windows x64 四个平台包；不提供原生 NTS 或 32 位 x86 包。

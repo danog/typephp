@@ -100,8 +100,9 @@ This two-phase design keeps multi-file and self-hosted builds deterministic.
   from property declarations.
 - **Modern PHP support** — PHP 8.4 property hooks, asymmetric visibility,
   PHP 8.5 `clone()`-with, and `(void)` discard expressions.
-- **Cross-platform & WASM** — Linux, Windows, and macOS targets for x64 and
-  ARM64, plus WASI 0.2 and browser (Jco) output.
+- **Cross-platform, mobile native & WASM** — Linux, Windows, and macOS targets
+  for x64 and ARM64; native Android/iOS application development with the
+  Android NDK and iOS SDK; plus WASI 0.2 and browser (Jco) output.
 - **Python bridge** — generate IDE helpers for Python modules and convert
   Python scripts to TypePHP.
 
@@ -161,9 +162,13 @@ sudo pacman -S base-devel cmake pkgconf gmp mpfr
 > by libmpdec, which is bundled with PHPX — no separate install required.
 
 Linux x64 is the primary development and full-test CI platform. The compiler
-also has Windows, macOS, ARM64, and WASI backends; availability of PHP embed,
-toolchain, and third-party libraries still determines which target can be
-built on a given host.
+also has Windows, macOS, ARM64, Android `arm64-v8a`, iPhoneOS `arm64`, and WASI
+backends; availability of PHP embed, platform SDKs, toolchains, and third-party
+libraries still determines which target can be built on a given host. Mobile
+apps can implement their UI structure, application state, and business logic
+in TypePHP while keeping only a thin platform-native UI bridge. See the
+[Android native app example](examples/android-native/) and the
+[iOS/macOS native app example](examples/apple-native/).
 
 Native release assets are built with the latest PHP 8.5 ZTS release. TypePHP
 publishes Linux x64, Linux ARM64, macOS ARM64, and Windows x64 packages. Native
