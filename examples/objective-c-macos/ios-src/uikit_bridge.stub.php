@@ -16,7 +16,7 @@ function ui_add_label(
     bool $bold
 ): int {}
 
-function ui_add_button(string $title, int $x, int $y, int $width, int $height): int {}
+function ui_add_button(string $title, int $x, int $y, int $width, int $height, int $style): int {}
 
 function ui_set_control_text(int $controlId, string $text): void {}
 

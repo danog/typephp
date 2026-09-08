@@ -72,6 +72,16 @@ class FunctionContext
     public array $explicitNativeTypeVars = [];
     /** @var array<string, string> C++ initializers folded into function-scope local declarations. */
     public array $localVarInitializers = [];
+    /**
+     * Proven non-escaping local Closure candidates. These are declaration-site
+     * plans only; the generator moves a successfully lowered entry into
+     * nativeLocalClosures when it emits the concrete C++ lambda.
+     *
+     * @var array<string, array{assignment: \PhpParser\Node\Expr\Assign, closure: \PhpParser\Node\Expr\Closure|\PhpParser\Node\Expr\ArrowFunction, calls: int}>
+     */
+    public array $localClosureCandidates = [];
+    /** @var array<string, true> Local variables already emitted as concrete C++ lambdas. */
+    public array $nativeLocalClosures = [];
     /** @var array<string, string> typed-ref local => directly referenced local. */
     public array $typedRefBindings = [];
     /** @var array<string, string> typed-ref local => canonical fixed-storage root. */
@@ -137,6 +147,8 @@ class FunctionContext
         $this->localVars = [];
         $this->explicitNativeTypeVars = [];
         $this->localVarInitializers = [];
+        $this->localClosureCandidates = [];
+        $this->nativeLocalClosures = [];
         $this->typedRefBindings = [];
         $this->typedRefRoots = [];
         $this->typedRefAliases = [];
@@ -196,6 +208,8 @@ class FunctionContext
     {
         $this->localVars = $localVars;
         $this->localVarInitializers = [];
+        $this->localClosureCandidates = [];
+        $this->nativeLocalClosures = [];
         $this->typedRefBindings = [];
         $this->typedRefRoots = [];
         $this->typedRefAliases = [];

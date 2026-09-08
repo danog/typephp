@@ -83,6 +83,14 @@ trait FunctionCallTrait
             return $pythonObjectCall;
         }
 
+        if ($this->isVarExpr($expr->name) && is_string($expr->name->name)) {
+            $localName = $this->parseIdentifier($expr->name);
+            $nativeClosureCall = $this->parseNativeLocalClosureCall($expr, $localName);
+            if ($nativeClosureCall !== null) {
+                return $nativeClosureCall;
+            }
+        }
+
         $callableClass = $this->detectClassOfExpr($expr->name);
         if ($this->isNativeObjectClass($callableClass)) {
             if ($expr->isFirstClassCallable()) {

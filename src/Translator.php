@@ -11,6 +11,7 @@ namespace TypePhp;
 use Ajaxray\AnsiKit\AnsiTerminal;
 use Ajaxray\AnsiKit\Components\Progressbar;
 use MJS\TopSort\Implementations\StringSort;
+use TypePhp\Analysis\LocalClosureAnalyzer;
 use TypePhp\Analysis\SsaBuilder;
 use TypePhp\Backend\CompilerFactory;
 use TypePhp\Build\CompileOptions;
@@ -5086,6 +5087,10 @@ CODE;
             foreach ($optimizedLoopVars as $varName => $type) {
                 $this->context->localVars[$varName] = $type;
             }
+        }
+
+        if ($v->stmts && !$this->class && $this->methodDef === null) {
+            $this->context->localClosureCandidates = (new LocalClosureAnalyzer())->analyze($v->stmts);
         }
 
         $stmts = '';

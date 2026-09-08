@@ -2,7 +2,7 @@ name: typephp_ios_hello
 version: 0.1.0
 mode: bin
 output: typephp_ios_hello
-php-version: "8.5"
+php-version: "8.4"
 cxx-std: c++17
 cpp-compiler: xcrun --sdk iphoneos clang++
 target-platform: arm64-apple-ios15.0
@@ -22,3 +22,5 @@ ld-flags:
   - -Wl,-dead_strip
   - -framework UIKit
   - -framework Foundation
+  - -framework CoreGraphics
+  - -lresolv

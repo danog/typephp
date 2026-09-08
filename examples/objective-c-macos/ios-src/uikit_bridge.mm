@@ -117,6 +117,7 @@ php::Int php_ui_add_label(
                          ? [UIFont systemFontOfSize:static_cast<CGFloat>(fontSize)
                                             weight:UIFontWeightSemibold]
                          : [UIFont systemFontOfSize:static_cast<CGFloat>(fontSize)];
+        label.textColor = bold ? UIColor.labelColor : UIColor.secondaryLabelColor;
         label.textAlignment = NSTextAlignmentCenter;
         label.numberOfLines = 0;
         label.adjustsFontSizeToFitWidth = YES;
@@ -131,15 +132,31 @@ php::Int php_ui_add_button(
     php::Int x,
     php::Int y,
     php::Int width,
-    php::Int height)
+    php::Int height,
+    php::Int style)
 {
     @autoreleasepool {
         UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
         button.frame = logical_rect(x, y, width, height);
-        [button setTitle:to_ns_string(title) forState:UIControlStateNormal];
-        button.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-        button.backgroundColor = UIColor.secondarySystemBackgroundColor;
-        button.layer.cornerRadius = 10;
+        UIButtonConfiguration *configuration;
+        if (style == 1) {
+            configuration = [UIButtonConfiguration filledButtonConfiguration];
+            configuration.baseBackgroundColor = UIColor.systemBlueColor;
+            configuration.baseForegroundColor = UIColor.whiteColor;
+        } else if (style == 2) {
+            configuration = [UIButtonConfiguration tintedButtonConfiguration];
+            configuration.baseBackgroundColor = UIColor.systemBlueColor;
+        } else {
+            configuration = [UIButtonConfiguration grayButtonConfiguration];
+        }
+        configuration.title = to_ns_string(title);
+        configuration.cornerStyle = UIButtonConfigurationCornerStyleLarge;
+        configuration.contentInsets = NSDirectionalEdgeInsetsMake(12, 18, 12, 18);
+        button.configuration = configuration;
+        button.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+        button.titleLabel.adjustsFontSizeToFitWidth = YES;
+        button.titleLabel.minimumScaleFactor = 0.75;
+        button.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
         [button addTarget:bridge
                    action:@selector(controlActivated:)
          forControlEvents:UIControlEventTouchUpInside];
@@ -156,7 +173,15 @@ void php_ui_set_control_text(php::Int controlId, php::Str text)
         if ([control isKindOfClass:UILabel.class]) {
             ((UILabel *) control).text = value;
         } else if ([control isKindOfClass:UIButton.class]) {
-            [(UIButton *) control setTitle:value forState:UIControlStateNormal];
+            UIButton *button = (UIButton *) control;
+            UIButtonConfiguration *configuration = button.configuration;
+            if (configuration != nil) {
+                configuration.title = value;
+                button.configuration = configuration;
+            } else {
+                [button setTitle:value forState:UIControlStateNormal];
+            }
+            button.accessibilityLabel = value;
         }
     }
 }

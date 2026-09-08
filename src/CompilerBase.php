@@ -5184,6 +5184,9 @@ class CompilerBase implements PropertyAccessContext
     {
         $code = '';
         foreach ($localVars as $name => $type) {
+            if (isset($this->context->nativeLocalClosures[$name])) {
+                continue;
+            }
             if (isset($this->context->arguments[$name])) {
                 continue;
             }

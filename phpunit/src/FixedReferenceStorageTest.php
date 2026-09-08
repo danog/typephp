@@ -16,12 +16,28 @@ final class FixedReferenceStorageTest extends BaseTest
 
     public static function fixedStorageProvider(): iterable
     {
-        yield 'string' => ['fixed-reference-string.php', 'php::Str'];
-        yield 'array' => ['fixed-reference-array.php', 'php::Array'];
         yield 'object' => ['fixed-reference-generic-object.php', 'php::Object'];
         yield 'typed object' => ['fixed-reference-object.php', 'php::Object'];
         yield 'stream' => ['fixed-reference-stream.php', 'php::Stream'];
         yield 'std container' => ['fixed-reference-std-container.php', 'php::StdVector'];
+    }
+
+    /** @dataProvider localClosureFixedReferenceProvider */
+    public function testNonEscapingLocalClosureUsesNativeReferenceCapture(
+        string $fixture,
+        string $capture,
+    ): void
+    {
+        $code = $this->compileFixture($fixture);
+
+        self::assertStringContainsString($capture, $code);
+        self::assertStringNotContainsString('php::newClosureWithParameters(', $code);
+    }
+
+    public static function localClosureFixedReferenceProvider(): iterable
+    {
+        yield 'string' => ['fixed-reference-string.php', 'auto closure = [&value]() mutable -> php::Var {'];
+        yield 'array' => ['fixed-reference-array.php', 'auto closure = [&value]() mutable -> php::Var {'];
     }
 
     public function testFixedStorageUsesNativeReferenceForKnownTypedParameter(): void

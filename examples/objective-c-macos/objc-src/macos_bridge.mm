@@ -135,7 +135,8 @@ php::Int php_ui_add_button(
     php::Int x,
     php::Int y,
     php::Int width,
-    php::Int height)
+    php::Int height,
+    php::Int style)
 {
     @autoreleasepool {
         NSButton *button = [NSButton buttonWithTitle:to_ns_string(title)
@@ -147,7 +148,13 @@ php::Int php_ui_add_button(
             static_cast<CGFloat>(width),
             static_cast<CGFloat>(height));
         button.bezelStyle = NSBezelStyleRounded;
-        button.keyEquivalent = @"\r";
+        button.controlSize = NSControlSizeLarge;
+        button.font = [NSFont systemFontOfSize:14 weight:NSFontWeightSemibold];
+        if (style == 1) {
+            button.bezelColor = NSColor.controlAccentColor;
+            button.contentTintColor = NSColor.whiteColor;
+            button.keyEquivalent = @"\r";
+        }
         button.autoresizingMask = NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin;
         [bridge.window.contentView addSubview:button];
         return static_cast<php::Int>(store_control(button));

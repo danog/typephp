@@ -71,17 +71,18 @@ final class VarIntTypesTest extends BaseTest
         }
     }
 
-    public function testNativeScalarCannotBePromotedForReferenceCapture(): void
+    public function testNativeScalarUsesDirectReferenceCaptureInNonEscapingClosure(): void
     {
-        $this->expectException(TestError::class);
-        $this->expectExceptionMessage(
-            'Cannot create a reference to variable $changed of fixed type php::Bool; initialize it with std::any()',
-        );
-
-        $this->compileSource(
+        $code = $this->compileSource(
             $this->createCompiler(),
             TYPEPHP_ROOT_PATH . '/phpunit/code/native-scalar-reference-capture.php',
         );
+
+        self::assertStringContainsString(
+            'auto set = [&changed]() mutable -> php::Var {',
+            $code,
+        );
+        self::assertStringNotContainsString('php::newClosureWithParameters(', $code);
     }
 
     public function testExplicitAnySupportsReferenceCapture(): void

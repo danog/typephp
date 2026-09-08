@@ -66,13 +66,29 @@ sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 xcrun --sdk iphoneos --show-sdk-path
 ```
 
-Install this SDK at `ios/iphoneos-arm64` inside the PHPX checkout, matching the
-integrated layouts already used by `full-static/sdk` and
-`wasm/wasm32-wasip2`. Build the executable from the TypePHP repository root;
-`PHPX_HOME` selects both PHPX sources and the target SDK:
+Build the SDK with swoole-cli. PHP source updates must go through
+`sync-source-code.php`; this also validates and synchronizes the generated Zend
+parser/scanner sources from the official php.net release archive:
 
 ```sh
-export PHPX_HOME=/path/to/phpx
+cd /path/to/swoole-cli
+php sync-source-code.php --action run
+php prepare.php @iphoneos-arm64 --with-parallel-jobs=8
+./make.sh all-library
+./make.sh config
+./make.sh libphp
+./make.sh phpx
+./make.sh sdk
+```
+
+The installed SDK is under
+`thirdparty/phpx/ios/iphoneos-arm64`. The `php-version` major in `ios.yml` must
+match `sapi/PHP-VERSION.conf` used by swoole-cli. Build the executable from the
+TypePHP repository root; `PHPX_HOME` selects both PHPX sources and the target
+SDK:
+
+```sh
+export PHPX_HOME=/path/to/swoole-cli/thirdparty/phpx
 php bin/tpc.php examples/objective-c-macos/ios.yml --no-progress
 ```
 
@@ -83,7 +99,17 @@ the login keychain:
 ```sh
 export TYPEPHP_IOS_PROVISIONING_PROFILE=/path/to/profile.mobileprovision
 export TYPEPHP_IOS_CODE_SIGN_IDENTITY='Apple Development: Your Name (TEAMID)'
+# Set this when the profile uses a different identifier than the example.
+export TYPEPHP_IOS_BUNDLE_IDENTIFIER='your.provisioned.bundle.identifier'
 sh examples/objective-c-macos/package-ios-app.sh
+```
+
+The package includes iPhone icon sizes generated from the repository's
+`swoole-logo.svg`. To regenerate them after changing the logo, install FFmpeg
+and run:
+
+```sh
+sh examples/objective-c-macos/generate-ios-icons.sh
 ```
 
 Find the connected iPhone and install the bundle:

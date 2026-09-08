@@ -172,6 +172,11 @@ trait AssignOpTrait
 
     protected function parseAssign(Expr\Assign $v): string
     {
+        $nativeClosure = $this->parseNativeLocalClosureAssignment($v);
+        if ($nativeClosure !== null) {
+            return $nativeClosure;
+        }
+
         $left  = $v->var;
         $right = $v->expr;
         if ($this->isAssignExpr($right)) {
