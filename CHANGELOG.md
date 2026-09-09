@@ -73,7 +73,8 @@ The former global compile-time functions have changed as follows:
 | `refval($target)` | `std::ref($target)` | Explicit reference wrapper for call arguments. |
 | `expected($condition)` | `std::expected($condition)` | Emits the `EXPECTED(...)` branch hint. |
 | `unexpected($condition)` | `std::unexpected($condition)` | Emits the `UNEXPECTED(...)` branch hint. |
-| `objval($value, Foo::class)` | `$value->toObject(Foo::class)` | Replaced by the existing keyword method. |
+| `objval($value, Foo::class)` | `std::object($value, Foo::class)` | Restores concrete object type information; the equivalent keyword method remains available as `$value->toObject(Foo::class)`. |
+| `std::ordered_map($keyType, $valueType)` | `std::orderedMap($keyType, $valueType)` | Uses the standard camelCase spelling for a multi-word method name. |
 
 No compatibility functions are installed in the global namespace. Applications
 may define and call their own `any()`, `refval()`, `expected()`, `unexpected()`,
@@ -153,7 +154,8 @@ TypePHP 编译期 API 现在只占用两个全局类符号：
 | `refval($target)` | `std::ref($target)` | 调用参数的显式引用包装器。 |
 | `expected($condition)` | `std::expected($condition)` | 生成 `EXPECTED(...)` 分支提示。 |
 | `unexpected($condition)` | `std::unexpected($condition)` | 生成 `UNEXPECTED(...)` 分支提示。 |
-| `objval($value, Foo::class)` | `$value->toObject(Foo::class)` | 改用现有关键词方法。 |
+| `objval($value, Foo::class)` | `std::object($value, Foo::class)` | 恢复具体对象类型；仍可使用等价关键词方法 `$value->toObject(Foo::class)`。 |
+| `std::ordered_map($keyType, $valueType)` | `std::orderedMap($keyType, $valueType)` | 多单词方法统一使用 camelCase 命名。 |
 
 TypePHP 不在全局命名空间安装兼容函数。应用可以自行定义并正常调用
 `any()`、`refval()`、`expected()`、`unexpected()` 和 `objval()`，编译器不会拦截。

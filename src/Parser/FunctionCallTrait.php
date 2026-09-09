@@ -247,6 +247,25 @@ trait FunctionCallTrait
         return $this->parseExprAsValue($value);
     }
 
+    /**
+     * Restore a concrete Zend object type through std::object().
+     */
+    protected function parseObjectCompileTimeCall(Expr\StaticCall $expr): string
+    {
+        if (count($expr->args) !== 2
+            || !$expr->args[0] instanceof Node\Arg
+            || !$expr->args[1] instanceof Node\Arg
+            || $expr->args[0]->unpack
+            || $expr->args[1]->unpack
+        ) {
+            $this->fatalError($expr, 'The std::object function expects exactly two non-unpacked arguments');
+        }
+
+        $value = $this->parseExprAsValue($expr->args[0]->value);
+        $className = $this->resolveClassNameArg($expr->args[1]->value);
+        return 'php::toObject(' . $value . ', ' . $this->getClassEntryPtr($className) . ')';
+    }
+
     private function parseNamedExitMessageCall(string $name, Expr\FuncCall $expr): ?string
     {
         if (!in_array(strtolower($name), ['exit', 'die'], true)

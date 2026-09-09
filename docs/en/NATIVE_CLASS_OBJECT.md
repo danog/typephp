@@ -248,7 +248,7 @@ The following types are explicitly forbidden as Native Class property types:
 - `std\array`
 - `std\vector`
 - `std\map`
-- `std\ordered_map`
+- `std\orderedMap`
 - Other Std Container types added later
 
 These types have independent generic layouts and reference or ownership semantics; embedding them in Native Class would significantly expand the first version's type-combination and lifetime-analysis scope. Developers can use ordinary PHP `array` fields; Native Objects still cannot be stored in a PHP array, because Native Object has no `zval` representation.
@@ -832,7 +832,7 @@ The first version forbids a Native Object from being:
 - Used as the receiver of dynamic callbacks such as `call_user_func()`.
 - Saved into ZendVM global variables or object properties.
 
-Box cannot hold Native Objects. Std Containers cannot be Native Class properties, but local `std::array`, `std::vector`, `std::map`, and `std::ordered_map` can use a concrete `NativeClass::class` as the value type and hold that class or its Native subclasses. Ordinary PHP arrays still cannot hold Native Objects.
+Box cannot hold Native Objects. Std Containers cannot be Native Class properties, but local `std::array`, `std::vector`, `std::map`, and `std::orderedMap` can use a concrete `NativeClass::class` as the value type and hold that class or its Native subclasses. Ordinary PHP arrays still cannot hold Native Objects.
 
 TypePHP's current Std Containers themselves are only allowed as local variables inside functions, not as global/static, so there is no long-term container ownership that needs separate design for Native elements. A Native-element Std Container further requires it to be a top-level local variable of the function. The compiler generates a `NativeContainerRootFrame` matching its lexical lifetime for that local container; therefore it cannot be saved to global/static, Zend or Native properties, PHP arrays, and cannot be returned, taken by reference, captured into a Closure/arrow function, or converted via `toArray()`/`toAny()`. All of the above would make the raw-pointer-holding `StdContainerBox` outlive the root frame, and must be uniformly rejected at compile time. Reading or writing a single typed Native element still stays within the Native pointer model and does not constitute container escape.
 

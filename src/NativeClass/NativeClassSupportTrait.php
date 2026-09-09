@@ -1662,7 +1662,7 @@ trait NativeClassSupportTrait
             'std\\array',
             'std\\vector',
             'std\\map',
-            'std\\ordered_map',
+            'std\\orderedmap',
         ], true);
     }
 

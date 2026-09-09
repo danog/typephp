@@ -83,16 +83,16 @@ This two-phase design keeps multi-file and self-hosted builds deterministic.
 - **High-precision numerics** — `bigInt` (GMP), `decimal` (libmpdec), and
   `bigFloat` (MPFR), with typed operators and method APIs.
 - **Strongly-typed containers** — `std::array`, `std::vector`, `std::map`, and
-  `std::ordered_map` with compile-time element types; up to **10×** faster than
+  `std::orderedMap` with compile-time element types; up to **10×** faster than
   PHP arrays and on par with C++ `std::vector`.
 - **Universal methods** — call methods directly on primitives
   (`$s->upper()`, `$arr->contains()`, `$big->mul(2)`); statically-known calls
   are resolved directly at compile time.
 - **Mixed C++ / PHP** — call C++ functions from PHP (and vice versa) for
   performance-critical kernels.
-- **Compile-time functions & keywords** — `std::any()`, `std::ref()`,
-  `std::expected()`, `std::unexpected()`, plus `toObject()`, `toInt()`, `toString()`, `toArray()` and
-  friends.
+- **Compile-time functions & keywords** — `std::any()`, `std::object()`,
+  `std::ref()`, `std::expected()`, `std::unexpected()`, plus `toObject()`,
+  `toInt()`, `toString()`, `toArray()` and friends.
 - **Compile-time safety** — `#[Immutable]` read-only contracts and `#[ArrayDef]`
   array-shape metadata, checked at compile time with zero runtime cost.
 - **Compile-time code generation** — `#[Getter]`, `#[Setter]`, `#[With]`,
@@ -490,7 +490,7 @@ function main(): void
     echo $vector[1] . "\n"; // 2
 
     // key-value map with fixed key/value types
-    $map = std::ordered_map(Type::String, Type::Int);
+    $map = std::orderedMap(Type::String, Type::Int);
     $map["a"] = 1;
     $map["b"] = 2;
 }

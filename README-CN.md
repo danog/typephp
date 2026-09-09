@@ -72,14 +72,15 @@ AST，待全部项目符号就绪后再在 convert 阶段解析。这一两阶�
   （`int64_t`、`double`、`bool`），数值代码可获得数量级的性能提升。
 - **高精度数值** —— `bigInt`（GMP）、`decimal`（libmpdec）、`bigFloat`（MPFR），
   提供强类型运算符和方法 API。
-- **强类型容器** —— `std::array`、`std::vector`、`std::map`、`std::ordered_map`，
+- **强类型容器** —— `std::array`、`std::vector`、`std::map`、`std::orderedMap`，
   元素类型在编译期确定；最高比 PHP 数组快 **10 倍**，性能与 C++ `std::vector` 相当。
 - **通用方法（Universal Methods）** —— 在原生类型上直接调用方法
   （`$s->upper()`、`$arr->contains()`、`$big->mul(2)`）；静态类型已知时在编译期
   直接解析调用。
 - **混合 C++ / PHP 编程** —— 在性能关键内核中直接调用 C++ 函数（反之亦然）。
-- **编译期函数与关键词** —— `std::any()`、`std::ref()`、`std::expected()`、
-  `std::unexpected()`，以及 `toObject()`、`toInt()`、`toString()`、`toArray()` 等。
+- **编译期函数与关键词** —— `std::any()`、`std::object()`、`std::ref()`、
+  `std::expected()`、`std::unexpected()`，以及 `toObject()`、`toInt()`、
+  `toString()`、`toArray()` 等。
 - **编译期安全检查** —— `#[Immutable]` 只读契约和 `#[ArrayDef]` 数组结构元数据，
   在编译期检查，零运行时开销。
 - **编译期代码生成** —— `#[Getter]`、`#[Setter]`、`#[With]`、`#[Constructor]`、
@@ -450,7 +451,7 @@ function main(): void
     echo $vector[1] . "\n"; // 2
 
     // 固定 key/value 类型的映射
-    $map = std::ordered_map(Type::String, Type::Int);
+    $map = std::orderedMap(Type::String, Type::Int);
     $map["a"] = 1;
     $map["b"] = 2;
 }

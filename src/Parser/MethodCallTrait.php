@@ -384,6 +384,9 @@ trait MethodCallTrait
         if ($func === 'any') {
             return $this->parseAnyCompileTimeCall($expr);
         }
+        if ($func === 'object') {
+            return $this->parseObjectCompileTimeCall($expr);
+        }
         if ($func === 'expected' || $func === 'unexpected') {
             if (count($expr->args) !== 1
                 || !$expr->args[0] instanceof Node\Arg

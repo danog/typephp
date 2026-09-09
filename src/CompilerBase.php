@@ -2200,6 +2200,14 @@ class CompilerBase implements PropertyAccessContext
             }
         }
         if ($this->isStaticCall($expr) and $this->isNameExpr($expr->class) and $this->isNamedMethod($expr->name)) {
+            if ($this->isStdClassExpr($expr->class)
+                && strtolower($this->parseIdentifier($expr->name)) === 'object'
+                && count($expr->args) === 2
+                && $expr->args[1] instanceof Node\Arg
+                && !$expr->args[1]->unpack
+            ) {
+                return $this->resolveClassNameArg($expr->args[1]->value);
+            }
             $class = $this->parseIdentifier($expr->class);
             if ($class === 'self') {
                 $class = $this->class;
@@ -3239,6 +3247,7 @@ class CompilerBase implements PropertyAccessContext
                             'bigint' => Type::BIGINT,
                             'decimal' => Type::DECIMAL,
                             'bigfloat' => Type::BIGFLOAT,
+                            'object' => Type::OBJECT,
                             'expected', 'unexpected' => Type::BOOL,
                             default => Type::VAR,
                         };

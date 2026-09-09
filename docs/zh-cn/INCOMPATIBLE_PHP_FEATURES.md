@@ -84,7 +84,7 @@
 - `foreach` by reference 的 value 只能是变量。
 - `foreach` list destructuring 不支持按引用绑定元素。
 - 非 `int/bool` lowering 路径中的非空 `switch` case 必须以 `return`、`break`、`continue`、`exit` 或 `throw` 结束；不要依赖 PHP 的隐式 case fallthrough。当前 `int/bool` native switch 路径仍可保留 C++ fallthrough，因此项目代码应统一显式终止每个非空 case。
-- `std::vector`、`std::map`、`std::ordered_map` 在 `foreach` 期间禁止追加、插入、`unset()` 或整体替换；已有元素的非结构性更新仍可使用赋值运算符完成。
+- `std::vector`、`std::map`、`std::orderedMap` 在 `foreach` 期间禁止追加、插入、`unset()` 或整体替换；已有元素的非结构性更新仍可使用赋值运算符完成。
 - 固定 native typed object property 不允许按 PHP 未初始化语义自由 `unset()`。
 - native 类型变量执行 `unset()` 不会产生标准 PHP 的变量删除语义。
 

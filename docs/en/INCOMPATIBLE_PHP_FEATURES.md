@@ -175,7 +175,7 @@ incompatible with or more restrictive than standard PHP.
   case fallthrough. The native `int/bool` switch path can currently retain C++
   fallthrough, so project code should terminate every non-empty case explicitly.
 - Appending, inserting, `unset()`, and wholesale replacement of `std::vector`,
-  `std::map`, and `std::ordered_map` are forbidden during a `foreach`;
+  `std::map`, and `std::orderedMap` are forbidden during a `foreach`;
   non-structural updates of existing elements can still be done with assignment
   operators.
 - Fixed native typed object properties cannot be freely `unset()` with PHP's

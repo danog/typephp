@@ -614,7 +614,7 @@ trait AssignOpTrait
                     $class = $this->parseIdentifier($right->class);
                     if ($this->isStdClassExpr($right->class)) {
                         $stdMethod = strtolower($right->name->toString());
-                        if (in_array($stdMethod, ['array', 'vector', 'map', 'ordered_map'], true)) {
+                        if (in_array($stdMethod, ['array', 'vector', 'map', 'orderedmap'], true)) {
                             if ($this->hasScopeGlobalVar($var) || $this->hasStaticVar($var)) {
                                 $this->assertNativeStdContainerFunctionLocal($right);
                             }
