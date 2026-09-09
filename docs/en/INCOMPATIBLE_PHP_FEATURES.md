@@ -122,6 +122,12 @@ incompatible with or more restrictive than standard PHP.
   slot would weaken the type system. Typed object/static properties remain
   reference-capable because Zend attaches property type sources; PHP array
   elements remain dynamic reference-capable slots.
+- A fixed `int`, `float`, `bool`, `string`, or `array` Native Class property may
+  be passed directly to an exactly matching reference parameter on a statically
+  resolved call. This is a call-scoped C++ `T&`, not a PHP reference: `=&`,
+  `std::ref()`, dynamic calls, reference returns, and other escaping forms remain
+  forbidden for fixed Native properties. Only a Native property explicitly
+  declared `any` supports the ordinary dynamic PHP reference model.
 - A call that uses argument unpacking followed by named arguments falls back to
   dynamic dispatch and cannot use the native call path.
 
