@@ -3148,11 +3148,15 @@ class CompilerBase implements PropertyAccessContext
                 }
                 break;
             case 'Expr_FuncCall':
+                if ($expr->isFirstClassCallable()) {
+                    return Type::OBJECT;
+                }
                 if ($this->isNameExpr($expr->name)) {
                     $name = $this->parseIdentifier($expr->name);
                     $globalName = ltrim($name, '\\');
                     // Math function optimization: propagate Big* return types
-                    if (in_array($name, ['abs', 'pow', 'sqrt', 'floor', 'ceil', 'round'], true) && !empty($expr->args)) {
+                    if (in_array($name, ['abs', 'pow', 'sqrt', 'floor', 'ceil', 'round'], true)
+                        && !empty($expr->args)) {
                         $argType = $this->detectTypeOfExpr($expr->args[0]->value);
                         if (
                             $argType === Type::BIGINT
@@ -3175,9 +3179,6 @@ class CompilerBase implements PropertyAccessContext
                     }
                     if (in_array($name, self::STREAM_FUNCTIONS)) {
                         return Type::STREAM;
-                    }
-                    if (count($expr->args) === 1 and $this->isPlaceholderExpr($expr->args[0])) {
-                        return Type::OBJECT;
                     }
                     if ($this->hasFunction($name)) {
                         return $this->getFunction($name)->returnType;
@@ -3465,6 +3466,12 @@ class CompilerBase implements PropertyAccessContext
             $this->validateInternalNamedCallArgs($ref, $expr->args);
         }
         if ($this->hasUnpackCallArg($expr->args)) {
+            return;
+        }
+        // `foo(...)` is PHP 8.1 first-class callable syntax: it creates a
+        // Closure instead of calling foo, so its single VariadicPlaceholder
+        // must not be counted/validated against foo's real signature.
+        if ($expr->isFirstClassCallable()) {
             return;
         }
         $actualArgCount = count($expr->args);
