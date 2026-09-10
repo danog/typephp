@@ -6008,7 +6008,7 @@ function parseClass(
     return new ClassInfo(
         $name,
         $class instanceof Class_
-            ? $class->flags
+            ? (getTranslator()->isOpenWorld() ? $class->flags & ~Modifiers::FINAL : $class->flags)
             : ($class instanceof Enum_ ? Modifiers::FINAL : 0),
         $classKind,
         $alias,

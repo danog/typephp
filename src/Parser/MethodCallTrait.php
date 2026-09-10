@@ -215,8 +215,16 @@ trait MethodCallTrait
             return true;
         }
 
+        // A sole `new` definition proves the exact runtime class.
+        if ($object !== 'this_' && isset($this->context->exactObjects[$object])
+            && strcasecmp(ltrim($this->context->exactObjects[$object], '\\'), ltrim($class, '\\')) === 0
+        ) {
+            return true;
+        }
+
         // Case 4: Typed object whose class has no known subclasses
-        if ($object !== 'this_' && $this->hasClass($class)) {
+        // (not in open-world mode: runtime-loaded code may subclass it)
+        if (!$this->openWorld && $object !== 'this_' && $this->hasClass($class)) {
             $classLower = strtolower($class);
             if (!$this->hasSubClasses($classLower) && !$this->isInterface($class) && !$this->isAbstractClass($class)) {
                 return true;
@@ -261,8 +269,10 @@ trait MethodCallTrait
 
         $fullMethodName = $this->getOverrideMethodName($class, $method);
 
-        // A subclass declares a method with the same name, so try to devirtualize
-        if ($this->isOverrideMethod($fullMethodName)) {
+        // A subclass declares a method with the same name, so try to devirtualize.
+        // In open-world mode any overridable method may be overridden by a
+        // runtime-loaded subclass.
+        if ($this->openWorld || $this->isOverrideMethod($fullMethodName)) {
             if (!$this->canDevirtualize($object, $class, $method)) {
                 return false;
             }

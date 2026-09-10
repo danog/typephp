@@ -514,6 +514,20 @@ class CompilerBase implements PropertyAccessContext
     protected bool $printBacktraceOnError = true;
     protected bool $noLiteralStrings = false;
     protected bool $noConsole = false;  // Windows: hide console window
+
+    /**
+     * Open-world mode: compiled classes may be extended by code loaded at
+     * runtime (plugins, test doubles). Classes are registered without the
+     * `final` flag and method calls are only devirtualized when the method
+     * itself cannot be overridden (final or private), never because the
+     * compiled sources contain no subclass.
+     */
+    protected bool $openWorld = false;
+
+    public function isOpenWorld(): bool
+    {
+        return $this->openWorld;
+    }
     protected string $sanitize = '';    // Sanitizer type (address, undefined, etc.)
     protected bool $dryRun = false;     // Dry run: only generate C++ code, skip compile & link
     protected array $userIncludePaths = [];  // --include-path / -I: user-provided C++ include dirs

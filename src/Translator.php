@@ -3125,6 +3125,10 @@ CODE;
             $this->sanitize = (string) $sanitize;
         }
 
+        if (!empty($cfg['open-world'])) {
+            $this->openWorld = true;
+        }
+
         // Read cxx-flags
         $cxxFlags = $cfg['cxx-flags'] ?? null;
         if (!empty($cxxFlags)) {

@@ -1653,6 +1653,9 @@ class Preprocessor extends CompilerBase
 
         if ($class instanceof Node\Stmt\Class_) {
             $flags = $class->flags;
+            if ($this->openWorld) {
+                $flags &= ~Modifiers::FINAL;
+            }
         } elseif ($class instanceof Node\Stmt\Enum_) {
             // PHP lowers every enum declaration as ZEND_ACC_ENUM | ZEND_ACC_FINAL.
             // Keep the compiler model equally final for inheritance checks and
