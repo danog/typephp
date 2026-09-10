@@ -889,7 +889,27 @@ trait AssignOpTrait
 
     protected function parseAssignRightExpr(Expr $right): string
     {
+        $afterCount = count($this->context->afterStmtLines);
         $rightExpr = $this->parseExprAsValue($right);
+        $deferred = array_slice($this->context->afterStmtLines, $afterCount);
+        if ($deferred !== []) {
+            // The right-hand side produced deferred statements (by-reference
+            // copy-outs of a dynamic call, RefWrap commits, postfix updates).
+            // They must run after the call but before the assignment, or a
+            // `$x = $obj->m($x)` copy-out would clobber the assigned result:
+            // materialize the value first, then flush them.
+            $type = $this->detectTypeOfExpr($right);
+            if (in_array($type, [Type::VAR, Type::REF], true) || Type::isTypedRefType($type)) {
+                $type = Type::VAR;
+            }
+            $tmp = $this->addTmpVar($type);
+            $this->context->beforeStmtLines[] = $tmp . ' = ' . $rightExpr . ';';
+            foreach ($deferred as $line) {
+                $this->context->beforeStmtLines[] = $line;
+            }
+            $this->context->afterStmtLines = array_slice($this->context->afterStmtLines, 0, $afterCount);
+            $rightExpr = $tmp;
+        }
         if ($this->isVarExpr($right)) {
             $rightVar = $this->parseIdentifier($right);
             if ($this->isStdContainer($rightVar)) {
