@@ -186,6 +186,12 @@ final class PropertyAccessResolver
         if ($propRef->hasHooks()) {
             return null;
         }
+        // Virtual properties of internal classes (DOMDocument::$formatOutput,
+        // DOMElement::$tagName, ...) have no slot: they are served by the
+        // extension's property handlers, so use the string path.
+        if (method_exists($propRef, 'isVirtual') && $propRef->isVirtual()) {
+            return null;
+        }
         if (!$static && $propRef->isStatic()) {
             $this->fatal($expr, "Cannot access static property `{$requestedClass}::\${$property}` as non-static instance property.");
         }
