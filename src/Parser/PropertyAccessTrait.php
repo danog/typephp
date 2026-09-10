@@ -347,6 +347,12 @@ trait PropertyAccessTrait
                 . $object . ', ' . $property . ', php::FakeScopeGuard::current(), php::AttrMode::Update)'
                 . ".newItem() = {$value}";
         }
+        if ($this->class && !($this->classDef?->trait)) {
+            return 'typephp_read_property_scoped_cached('
+                . $object . ', ' . $property . ', ' . $this->getLocalClassEntryPtr($this->getFullClassName())
+                . ', php::AttrMode::Update, ' . ($cache ?? $this->getPropertyAccessCache()) . ')'
+                . ".newItem() = {$value}";
+        }
         if ($cache !== null) {
             return 'typephp_read_property_cached('
                 . $object . ', ' . $property . ', php::AttrMode::Update, ' . $cache . ')'
@@ -366,6 +372,12 @@ trait PropertyAccessTrait
         if ($this->usesTraitPropertyScope($object)) {
             return 'typephp_assign_dim(typephp_read_property_scoped('
                 . $object . ', ' . $property . ', php::FakeScopeGuard::current(), php::AttrMode::Update)'
+                . ", {$dim}, {$value})";
+        }
+        if ($this->class && !($this->classDef?->trait)) {
+            return 'typephp_assign_dim(typephp_read_property_scoped_cached('
+                . $object . ', ' . $property . ', ' . $this->getLocalClassEntryPtr($this->getFullClassName())
+                . ', php::AttrMode::Update, ' . ($cache ?? $this->getPropertyAccessCache()) . ')'
                 . ", {$dim}, {$value})";
         }
         if ($cache !== null) {
