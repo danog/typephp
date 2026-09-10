@@ -592,14 +592,11 @@ trait AssignOpTrait
                 } elseif (($leftClass = $this->getDeclaredObjectType($var)) !== '') {
                     if ($this->isObjectClassStaticallyAssignableTo($rightClass, $leftClass)) {
                         // A child object can be assigned to a parent typed object.
-                    } elseif ($this->isObjectClassStaticallyAssignableTo($leftClass, $rightClass)) {
-                        // The declared (parent/interface/abstract) type of the value may hold the local's concrete class: keep it with a runtime check. An unrelated class is a conflict.
-                        if ($this->isKnownConcreteObjectExpr($right, $rightClass)) {
-                            $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
-                        }
-                        // Parent/interface/abstract declarations are not precise enough for a concrete typed object.
-                        $runtimeObjectAssignClass = $leftClass;
                     } else {
+                        // A value declared with a parent/interface type (or an
+                        // unrelated class) may hold any subclass: statically
+                        // dispatched calls generated for the local would be
+                        // wrong, so the local needs dynamic storage.
                         $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
                     }
                 } else {
@@ -688,9 +685,6 @@ trait AssignOpTrait
                     if ($leftClass !== '' and $rightClass !== '') {
                         if ($this->isObjectClassStaticallyAssignableTo($rightClass, $leftClass)) {
                             // A child object can be assigned to a parent typed object.
-                        } elseif ($this->isObjectClassStaticallyAssignableTo($leftClass, $rightClass)) {
-                        // The declared (parent/interface/abstract) type of the value may hold the local's concrete class: keep it with a runtime check. An unrelated class is a conflict.
-                            $runtimeObjectAssignClass = $leftClass;
                         } else {
                             $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
                         }
@@ -714,7 +708,9 @@ trait AssignOpTrait
                         && $finalVarType === Type::OBJECT
                         && $declaredObjectClass !== ''
                         && ($type === Type::VAR || $type === Type::OBJECT)) {
-                        $runtimeObjectAssignClass = $declaredObjectClass;
+                        // a value of unknown class replaces the declared one:
+                        // the local needs dynamic storage instead of a runtime cast
+                        $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` of class `{$declaredObjectClass}` from a value of unknown class");
                     }
                 }
             }
