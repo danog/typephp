@@ -1296,11 +1296,8 @@ trait AssignOpTrait
         if ($rightType === Type::VAR) {
             $rightExpr = $this->wrapObjectPropertyAssignTypeCheck($node->var, $node->expr, $rightExpr);
         }
-        $effectiveRightType = $rightType === Type::VAR && $this->getFixedPropertyTypeCheckHelper($def) !== null
-            ? $def->type
-            : $rightType;
-
-        return $var . ' ' . $op . ' (' . $this->convertNativePropertyWriteExpr($def->type, $effectiveRightType, $rightExpr) . ')';
+        // the runtime type check keeps a Variant: the native operator still needs the native type
+        return $var . ' ' . $op . ' (' . $this->convertNativePropertyWriteExpr($def->type, $rightType, $rightExpr) . ')';
     }
 
     protected function convertNativePropertyWriteExpr(string $propertyType, string $rightType, string $rightExpr): string
