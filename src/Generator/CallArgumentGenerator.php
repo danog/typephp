@@ -614,7 +614,16 @@ trait CallArgumentGenerator
                     if ($this->hasVar($name) && !$this->hasStaticVar($name)) {
                         $rawType = $this->getRawVarType($name);
                         if ($rawType === Type::VAR) {
-                            $this->addPositionalCallArg($name . '.toReference()', $arrayArgsVar, $list_args, $forceArrayArgs);
+                            // copy-in/copy-out through a fresh reference: the
+                            // local itself must not become a PHP reference
+                            // (assignments from a reference-holding value
+                            // rebind instead of copying)
+                            $tmpRef = $this->genTmpVarName();
+                            $this->addLocalVar($tmpRef, Type::REF);
+                            $this->context->beforeStmtLines[] = $tmpRef . ' = php::Reference();';
+                            $this->context->beforeStmtLines[] = $tmpRef . ' = ' . $name . ';';
+                            $this->context->afterStmtLines[] = $name . ' = ' . $tmpRef . ';';
+                            $this->addPositionalCallArg('&' . $tmpRef, $arrayArgsVar, $list_args, $forceArrayArgs);
                             continue;
                         }
                         if ($rawType === Type::REF) {
