@@ -1600,10 +1600,22 @@ class VersionFlags {
     }
 }
 
+/** Private class flag bit: the method belongs to an interface. */
+const TYPEPHP_CLASS_FLAG_INTERFACE = 1 << 30;
+
 class FuncInfo {
     public /* readonly */ FunctionOrMethodName $name;
     private /* readonly */ int $classFlags;
     public int $flags;
+
+    /** An abstract static method of a class (not of an interface). */
+    public function isAbstractStaticClassMethod(): bool
+    {
+        return ($this->flags & Modifiers::ABSTRACT)
+            && ($this->flags & Modifiers::STATIC)
+            && !($this->classFlags & TYPEPHP_CLASS_FLAG_INTERFACE);
+    }
+
     public /* readonly */ ?string $aliasType;
     public ?FunctionOrMethodName $alias;
     private /* readonly */ bool $isDeprecated;
@@ -1829,6 +1841,8 @@ class FuncInfo {
                 } else {
                     throw new Error("Cannot happen");
                 }
+            } elseif ($this->isAbstractStaticClassMethod()) {
+                $name = "zif_typephp_abstract_method";
             } elseif ($this->flags & Modifiers::ABSTRACT) {
                 $name = "NULL";
             } else {
@@ -1931,9 +1945,10 @@ class FuncInfo {
                 $flags[] = "ZEND_ACC_FINAL";
             }
 
-            // Zend warns about abstract static methods of internal classes
-            // ("cannot be abstract"); interface methods are abstract anyway.
-            if (($this->flags & Modifiers::ABSTRACT) && !($this->flags & Modifiers::STATIC)) {
+            // Zend rejects abstract static methods of internal classes
+            // ("cannot be abstract"): such a method is registered as a plain
+            // static method whose handler throws (see typephp_abstract_method).
+            if (($this->flags & Modifiers::ABSTRACT) && !$this->isAbstractStaticClassMethod()) {
                 $flags[] = "ZEND_ACC_ABSTRACT";
             }
         }
@@ -5192,6 +5207,9 @@ class FileInfo {
 
                     $classFlags = $stmt instanceof Class_ ? $stmt->flags : 0;
                     $abstractFlag = $stmt instanceof Stmt\Interface_ ? Modifiers::ABSTRACT : 0;
+                    if ($stmt instanceof Stmt\Interface_) {
+                        $classFlags |= TYPEPHP_CLASS_FLAG_INTERFACE;
+                    }
 
                     if ($classStmt instanceof Stmt\ClassConst) {
                         foreach ($classStmt->consts as $const) {

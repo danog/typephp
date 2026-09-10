@@ -876,7 +876,10 @@ trait MethodCallTrait
         );
         $resolvedMethodPtr = false;
         if ($class && $funcName && !$magicMethod) {
-            if ($this->isInternalClass($class)) {
+            // A method the internal class does not declare may still be
+            // callable through its get_method handler (SPL iterators forward
+            // to the inner iterator, __call): resolve it at runtime.
+            if ($this->isInternalClass($class) && \TypePhp\Resolver\Reflection::hasMethod($class, $funcName)) {
                 $methodPtr = $this->getMethodPtr($class, $funcName);
                 $resolvedMethodPtr = true;
             } else {
