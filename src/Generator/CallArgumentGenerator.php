@@ -649,7 +649,7 @@ trait CallArgumentGenerator
                     && $arg->value instanceof Node\Expr\PropertyFetch
                     && $this->isIdExpr($arg->value->name)
                     && $this->isVarExpr($arg->value->var)
-                    && !($this->getNativePropertyDef($arg->value)?->isReadonly() ?? false)
+                    && $this->isWritableCompiledProperty($arg->value)
                 ) {
                     $tmpRef = $this->genTmpVarName();
                     $this->addLocalVar($tmpRef, Type::REF);
@@ -1075,5 +1075,22 @@ trait CallArgumentGenerator
             }
         }
         return $this->parseExpr($value);
+    }
+
+    /**
+     * Whether `$obj->prop` is a declared, non-readonly property of a compiled
+     * class (so that a value can be written back to it after a call).
+     */
+    private function isWritableCompiledProperty(Node\Expr\PropertyFetch $fetch): bool
+    {
+        $receiverName = $this->parseIdentifier($fetch->var);
+        $class = $receiverName === 'this_'
+            ? ($this->classDef !== null ? $this->classDef->getNamespacedName(false) : $this->class)
+            : $this->getDeclaredObjectType($receiverName);
+        if ($class === '' || !$this->hasClass($class)) {
+            return false;
+        }
+        $def = $this->findCompiledClassPropertyDef($this->getClass($class), $this->parseIdentifier($fetch->name));
+        return $def !== null && !$def->isReadonly() && !$def->isStatic();
     }
 }
