@@ -655,7 +655,10 @@ trait CallArgumentGenerator
                     $this->addLocalVar($tmpRef, Type::REF);
                     $this->context->beforeStmtLines[] = $tmpRef . ' = php::Reference();';
                     $this->context->beforeStmtLines[] = $tmpRef . ' = ' . $this->parseExpr($arg->value) . ';';
-                    $writeBack = $this->parseExpr(new Node\Expr\Assign($arg->value, new Node\Expr\Variable($tmpRef)));
+                    // write back through a dynamic temporary (typed property writes take a Variant)
+                    $tmpValue = $this->addTmpVar(Type::VAR);
+                    $writeBack = $this->parseExpr(new Node\Expr\Assign($arg->value, new Node\Expr\Variable($tmpValue)));
+                    $this->context->afterStmtLines[] = $tmpValue . ' = ' . $tmpRef . ';';
                     $this->context->afterStmtLines[] = $writeBack . ';';
                     $this->addPositionalCallArg('&' . $tmpRef, $arrayArgsVar, $list_args, $forceArrayArgs);
                     continue;
