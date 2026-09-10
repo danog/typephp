@@ -301,6 +301,8 @@ trait AssignOpTrait
                     $key,
                     $item->getAttributes(),
                 );
+                // `[$a] = null` yields null silently in PHP (no offset warning)
+                $itemExpr->setAttribute('listItem', true);
                 if ($item->value instanceof Expr\List_) {
                     $code .= $this->getIndent()
                         . $this->parseAssignToList($item->value, $itemExpr)

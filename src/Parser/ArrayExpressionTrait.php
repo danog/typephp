@@ -263,6 +263,9 @@ trait ArrayExpressionTrait
                     }
                 }
             }
+            if (!$write && $node->getAttribute('listItem', false)) {
+                return 'typephp_list_item(' . $var . ', ' . $dim . ')';
+            }
             return $var . '.item(' . $dim . ', ' . $this->escapeBool($write) . ')';
         }
     }
