@@ -937,6 +937,10 @@ class CompilerBase implements PropertyAccessContext
 
     protected function getDeclaredObjectType(string $object): string
     {
+        if (isset($this->context->varTypeDegradations[$object])) {
+            // dynamic storage: no fixed class, whatever the SSA analysis inferred
+            return '';
+        }
         if (isset($this->context->declaredObjects[$object])) {
             return $this->context->declaredObjects[$object];
         }
