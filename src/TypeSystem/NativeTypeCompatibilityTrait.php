@@ -308,16 +308,22 @@ trait NativeTypeCompatibilityTrait
                 return $wrapper . '.typed()';
             }
 
-            // A mixed/union/defaulted reference parameter keeps the php::Ref
-            // ABI. When its caller is one of the five fixed native locals,
-            // bridge that storage for exactly this call and validate the
-            // write-back afterwards instead of weakening the local to Var.
+            // A mixed/union/nullable reference parameter keeps the php::Ref
+            // ABI: the callee may store a value of another type
+            // (`?array &$out = null` assigned null). A fixed native local
+            // cannot hold that, so the function is regenerated with dynamic
+            // storage for it.
             if ($this->isVarExpr($arg->value)) {
                 $var = $this->parseIdentifier($arg->value);
                 $rawType = $this->getRawVarType($var);
                 $valueType = Type::getReferencedType($rawType);
                 if (Type::getReferenceType($valueType) !== null) {
-                    return $this->getDynamicTypedRefBridge($var, $valueType) . '.ref()';
+                    $this->localTypeConflict(
+                        $arg,
+                        $var,
+                        'Variable $' . $this->unescapeVarName($var) . ' of type ' . $valueType
+                        . ' is passed to a dynamic by-reference parameter',
+                    );
                 }
             }
             return $this->convertToRef($arg->value);
