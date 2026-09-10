@@ -890,9 +890,11 @@ trait AssignOpTrait
     protected function parseAssignRightExpr(Expr $right): string
     {
         $afterCount = count($this->context->afterStmtLines);
+        $writeBackCount = count($this->context->deferredWriteBacks);
         $rightExpr = $this->parseExprAsValue($right);
         $deferred = array_slice($this->context->afterStmtLines, $afterCount);
-        if ($deferred !== []) {
+        if (count($this->context->deferredWriteBacks) > $writeBackCount) {
+            $this->context->deferredWriteBacks = array_slice($this->context->deferredWriteBacks, 0, $writeBackCount);
             // The right-hand side produced deferred statements (by-reference
             // copy-outs of a dynamic call, RefWrap commits, postfix updates).
             // They must run after the call but before the assignment, or a
@@ -903,7 +905,8 @@ trait AssignOpTrait
                 $type = Type::VAR;
             }
             $tmp = $this->addTmpVar($type);
-            $this->context->beforeStmtLines[] = $tmp . ' = ' . $rightExpr . ';';
+            $this->context->beforeStmtLines[] = $tmp . ' = '
+                . ($type === Type::VAR ? $rightExpr : $this->convertExprFromType($type, $rightExpr)) . ';';
             foreach ($deferred as $line) {
                 $this->context->beforeStmtLines[] = $line;
             }

@@ -623,6 +623,7 @@ trait CallArgumentGenerator
                             $this->context->beforeStmtLines[] = $tmpRef . ' = php::Reference();';
                             $this->context->beforeStmtLines[] = $tmpRef . ' = ' . $name . ';';
                             $this->context->afterStmtLines[] = $name . ' = ' . $tmpRef . ';';
+                            $this->context->deferredWriteBacks[] = $name . ' = ' . $tmpRef . ';';
                             $this->addPositionalCallArg('&' . $tmpRef, $arrayArgsVar, $list_args, $forceArrayArgs);
                             continue;
                         }
@@ -660,6 +661,7 @@ trait CallArgumentGenerator
                     $writeBack = $this->parseExpr(new Node\Expr\Assign($arg->value, new Node\Expr\Variable($tmpValue)));
                     $this->context->afterStmtLines[] = $tmpValue . ' = ' . $tmpRef . ';';
                     $this->context->afterStmtLines[] = $writeBack . ';';
+                    $this->context->deferredWriteBacks[] = $writeBack . ';';
                     $this->addPositionalCallArg('&' . $tmpRef, $arrayArgsVar, $list_args, $forceArrayArgs);
                     continue;
                 }
@@ -1031,6 +1033,7 @@ trait CallArgumentGenerator
         $this->context->beforeStmtLines[] = 'php::RefWrap<' . $valueType . '> '
             . $wrapper . '(' . $name . ');';
         $this->context->afterStmtLines[] = $wrapper . '.commit();';
+        $this->context->deferredWriteBacks[] = $wrapper . '.commit();';
         return $wrapper;
     }
 

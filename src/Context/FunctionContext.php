@@ -135,6 +135,9 @@ class FunctionContext
 
     public array $beforeStmtLines = [];
     public array $afterStmtLines = [];
+
+    /** @var list<string> after-statement lines that write a call result back (copy-outs, RefWrap commits) */
+    public array $deferredWriteBacks = [];
     public array $objectProps;
     /** Map of lazily resolved, function-local static-property zval slots. */
     public array $staticPropRefs = [];
@@ -223,6 +226,7 @@ class FunctionContext
         $this->nonNullNativeObjects = $nonNullNativeObjects;
         $this->beforeStmtLines = [];
         $this->afterStmtLines = [];
+        $this->deferredWriteBacks = [];
         $this->objectProps = [];
         $this->hoistedProps = [];
         $this->staticPropRefs = [];
