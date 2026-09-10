@@ -324,12 +324,14 @@ trait TypeConversionTrait
             return;
         }
 
-        $this->fatalError(
-            $errorNode,
-            'Cannot create a reference to variable $' . $this->unescapeVarName($name)
-                . ' of fixed type ' . $type
-                . '; initialize it with std::any() when reference semantics are required',
-        );
+        $message = 'Cannot create a reference to variable $' . $this->unescapeVarName($name)
+            . ' of fixed type ' . $type
+            . '; initialize it with std::any() when reference semantics are required';
+        if (!$this->hasStaticVar($name)) {
+            // regenerate the function with dynamic storage for this local
+            $this->localTypeConflict($errorNode, $name, $message);
+        }
+        $this->fatalError($errorNode, $message);
     }
 
 }
