@@ -306,7 +306,7 @@ trait PropertyAccessTrait
     {
         if ($this->isNativePropertyAccess($expr)) {
             // Variant::offsetSet() follows PHP: arrays are written in place, ArrayAccess objects get offsetSet()
-            return $this->parseWritableIdentifier($expr) . ".offsetSet({$dim}, {$value})";
+            return "typephp_assign_dim(" . $this->parseWritableIdentifier($expr) . ", {$dim}, {$value})";
         }
         if ($this->canEmitDynamicPropertyTarget($target)) {
             return $this->emitDynamicPropertyTargetUpdateArray(
@@ -355,16 +355,16 @@ trait PropertyAccessTrait
     ): string
     {
         if ($this->usesTraitPropertyScope($object)) {
-            return 'typephp_read_property_scoped('
+            return 'typephp_assign_dim(typephp_read_property_scoped('
                 . $object . ', ' . $property . ', php::FakeScopeGuard::current(), php::AttrMode::Update)'
-                . ".offsetSet({$dim}, {$value})";
+                . ", {$dim}, {$value})";
         }
         if ($cache !== null) {
-            return 'typephp_read_property_cached('
+            return 'typephp_assign_dim(typephp_read_property_cached('
                 . $object . ', ' . $property . ', php::AttrMode::Update, ' . $cache . ')'
-                . ".offsetSet({$dim}, {$value})";
+                . ", {$dim}, {$value})";
         }
-        return "{$object}.attr({$property}, php::AttrMode::Update).offsetSet({$dim}, {$value})";
+        return "typephp_assign_dim({$object}.attr({$property}, php::AttrMode::Update), {$dim}, {$value})";
     }
 
     protected function assertDynamicPropertyTarget(PropertyWriteTarget $target): void

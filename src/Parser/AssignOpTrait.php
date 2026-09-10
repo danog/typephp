@@ -1769,7 +1769,7 @@ trait AssignOpTrait
             return '((' . $tmp . ' = ' . $value . ', ' . $array . '.newItem() = ' . $tmp . '), ' . $tmp . ')';
         }
         $dim = $arrayDefWrite?->key ?? $this->parseIdentifier($left->dim);
-        return '((' . $tmp . ' = ' . $value . ', ' . $array . '.offsetSet(' . $dim . ', ' . $tmp . ')), ' . $tmp . ')';
+        return '((' . $tmp . ' = ' . $value . ', typephp_assign_dim(' . $array . ', ' . $dim . ', ' . $tmp . ')), ' . $tmp . ')';
     }
 
     protected function parseAssignOpCoalesce(Expr\AssignOp\Coalesce $expr): string
