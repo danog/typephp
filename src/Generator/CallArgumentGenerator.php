@@ -642,6 +642,24 @@ trait CallArgumentGenerator
                         }
                     }
                 }
+                // `$this->prop` / `$obj->prop` passed to an unknown callee: copy in
+                // through a fresh reference and write the (possibly modified)
+                // value back after the statement.
+                if (($className === self::DYNAMIC_CALLED_CLASS || ($funcName === '' && $className === ''))
+                    && $arg->value instanceof Node\Expr\PropertyFetch
+                    && $this->isIdExpr($arg->value->name)
+                    && $this->isVarExpr($arg->value->var)
+                    && !($this->getNativePropertyDef($arg->value)?->isReadonly() ?? false)
+                ) {
+                    $tmpRef = $this->genTmpVarName();
+                    $this->addLocalVar($tmpRef, Type::REF);
+                    $this->context->beforeStmtLines[] = $tmpRef . ' = php::Reference();';
+                    $this->context->beforeStmtLines[] = $tmpRef . ' = ' . $this->parseExpr($arg->value) . ';';
+                    $writeBack = $this->parseExpr(new Node\Expr\Assign($arg->value, new Node\Expr\Variable($tmpRef)));
+                    $this->context->afterStmtLines[] = $writeBack . ';';
+                    $this->addPositionalCallArg('&' . $tmpRef, $arrayArgsVar, $list_args, $forceArrayArgs);
+                    continue;
+                }
                 $value = $this->parseOrderedDynamicCallArgValue($arg, $i, $lastHoistingArgIndex);
                 $this->addPositionalCallArg($value, $arrayArgsVar, $list_args, $forceArrayArgs);
             }
