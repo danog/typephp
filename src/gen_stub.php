@@ -4363,11 +4363,20 @@ class ClassInfo {
         // Zend merges interface property contracts immediately. Declare the
         // class/interface's own properties first so an implementation can
         // replace a virtual abstract contract with its real property slot.
+        $interfaces = $this->type === "interface" ? $this->extends : $this->implements;
+        // zend_class_implements() links the interfaces one by one, and
+        // Traversable's handler requires Iterator/IteratorAggregate to be
+        // linked already: `implements SomeTraversableInterface, IteratorAggregate`
+        // must register IteratorAggregate first.
+        usort($interfaces, static function (Name $a, Name $b): int {
+            $rank = static fn (Name $n): int => in_array(strtolower($n->getLast()), ['iterator', 'iteratoraggregate'], true) ? 0 : 1;
+            return $rank($a) <=> $rank($b);
+        });
         $implements = array_map(
             function (Name $item) {
                 return "class_entry_" . implode("_", $item->getParts());
             },
-            $this->type === "interface" ? $this->extends : $this->implements
+            $interfaces
         );
         if (!empty($implements)) {
             $code .= "\tzend_class_implements(class_entry, " . count($implements) . ", " . implode(", ", $implements) . ");\n";
