@@ -5276,7 +5276,19 @@ class CompilerBase implements PropertyAccessContext
 
     protected function checkVarAssignExpr(NodeAbstract $left, string $toType, string $fromType): bool
     {
-        if ($toType === Type::VAR or $fromType === Type::VAR) {
+        if ($toType === Type::VAR) {
+            return true;
+        }
+        if ($fromType === Type::VAR) {
+            // A dynamic value (null, false, a string, ...) stored in fixed
+            // native storage would be converted silently (`$a = null` on an
+            // array local yields []); the local needs dynamic storage instead.
+            if ($this->isVarExpr($left)
+                && in_array($toType, [Type::INT, Type::FLOAT, Type::STR, Type::BOOL, Type::ARRAY], true)
+            ) {
+                $name = $this->parseIdentifier($left);
+                $this->localTypeConflict($left, $name, "Cannot assign a dynamic value to `\${$name}` of type `{$toType}`");
+            }
             return true;
         }
         $toType = Type::getReferencedType($toType);
