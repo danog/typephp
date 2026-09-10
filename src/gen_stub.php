@@ -3958,7 +3958,11 @@ class PropertyInfo extends VariableLike
                 return "\tZVAL_EMPTY_STRING(&$zvalName);\n";
             }
             if ($simpleType->isArray()) {
-                return "\tZVAL_EMPTY_ARRAY(&$zvalName);\n";
+                // An array property without a default is uninitialized in
+                // PHP: `isset(self::$cache)` is false and
+                // `self::$cache ??= self::init()` assigns. An empty array
+                // default would skip such initializers.
+                return "\tZVAL_UNDEF(&$zvalName);\n";
             }
         }
         return "\tZVAL_NULL(&$zvalName);\n";

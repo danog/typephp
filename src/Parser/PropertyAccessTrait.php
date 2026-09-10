@@ -49,7 +49,11 @@ trait PropertyAccessTrait
         }
 
         $exactClass = null;
-        if ($object === 'this_' && $this->isCurrentClassFinal()) {
+        // A property declared by the current class (or a compiled parent)
+        // keeps its slot in every subclass instance, so `$this->prop` may use
+        // the declaring class's offset even when `$this` is a subclass;
+        // private properties of a parent are reachable only this way.
+        if ($object === 'this_' && !($this->classDef?->trait)) {
             $exactClass = $this->getFullClassName();
         } elseif (isset($this->context->exactObjects[$object])) {
             $exactClass = $this->context->exactObjects[$object];
@@ -1241,6 +1245,9 @@ trait PropertyAccessTrait
                 . $this->getNativeObjectPropertyCppName($resolution->propertyDef, $resolution->classDef);
         }
         $objectVar = $this->parenthesizeOpenOperand($objectName);
+        $attrMode = !$update && $expr->getAttribute(self::ATTR_PROPERTY_FETCH_PRESENCE, false) === true
+            ? 'php::AttrMode::Isset'
+            : $this->escapeAttrMode($update);
         $directMagic = !$update && !$this->isNativePropertyAccess($expr)
             ? $this->resolveDirectMagicPropertyAccess($expr, $objectVar, '__get')
             : null;
@@ -1251,13 +1258,13 @@ trait PropertyAccessTrait
                 . ' return ' . $directMagic['function'] . '(' . $objectVar . ', ' . $id . '); })';
         } elseif ($this->usesTraitPropertyScope($objectVar)) {
             $getProperty = 'typephp_read_property_scoped('
-                . $objectVar . ', ' . $id . ', php::FakeScopeGuard::current(), ' . $this->escapeAttrMode($update) . ')';
+                . $objectVar . ', ' . $id . ', php::FakeScopeGuard::current(), ' . $attrMode . ')';
         } elseif ($this->isIdExpr($property) && !$this->isNativePropertyAccess($expr)) {
             $getProperty = 'typephp_read_property_cached('
-                . $objectVar . ', ' . $id . ', ' . $this->escapeAttrMode($update) . ', '
+                . $objectVar . ', ' . $id . ', ' . $attrMode . ', '
                 . $this->getPropertyAccessCache() . ')';
         } else {
-            $getProperty = $objectVar . '.attr(' . $id . ', ' . $this->escapeAttrMode($update) . ')';
+            $getProperty = $objectVar . '.attr(' . $id . ', ' . $attrMode . ')';
         }
         $def = $this->getNativePropertyDef($expr);
         if ($def && $this->usesNativeScalarStorage($def->type)) {

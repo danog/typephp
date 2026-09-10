@@ -161,6 +161,8 @@ class CompilerBase implements PropertyAccessContext
     protected const int COMPOSITE_TYPE_MATCH = 1;
     protected const string ATTR_ARRAY_DIM_FETCH_UPDATE = 'aotArrayDimFetchUpdate';
     protected const string ATTR_PROPERTY_FETCH_UPDATE = 'aotPropertyFetchUpdate';
+    /** the fetch is the subject of isset()/empty()/?? : read silently (uninitialized typed properties are not an error) */
+    protected const string ATTR_PROPERTY_FETCH_PRESENCE = 'aotPropertyFetchPresence';
     protected const string ATTR_STATEMENT_EXPRESSION = 'aotStatementExpression';
     protected const string ATTR_MULTI_RETURN_IMPL = 'aotMultiReturnImpl';
     protected const string ATTR_SCOPED_CALLBACK = 'aotScopedCallback';
@@ -4730,8 +4732,12 @@ class CompilerBase implements PropertyAccessContext
             // $getValue is true: fall through to use the chain+result mechanism,
             // which ensures the result type is TYPE_VAR (compatible with ternaries).
         }
+        $presenceOp = in_array($op, [self::OP_ISSET, self::OP_EMPTY, self::OP_NOT_EMPTY], true);
         // Single property read (non-chained).
         if ($this->isPropertyFetch($expr) and $this->isVarExpr($expr->var) and $this->isIdExpr($expr->name)) {
+            if ($presenceOp) {
+                $expr->setAttribute(self::ATTR_PROPERTY_FETCH_PRESENCE, true);
+            }
             $prop = $this->parsePropertyFetch($expr);
             if ($this->isNativePropertyAccess($expr)) {
                 if ($op === self::OP_REFVAL) {
@@ -4776,6 +4782,9 @@ class CompilerBase implements PropertyAccessContext
                 // class, so isset()/?? could observe a different slot from a
                 // normal native read or write.
                 if ($this->isNativePropertyAccess($expr)) {
+                    if ($presenceOp) {
+                        $expr->setAttribute(self::ATTR_PROPERTY_FETCH_PRESENCE, true);
+                    }
                     $var = $this->parsePropertyFetch($expr);
                     break;
                 }
