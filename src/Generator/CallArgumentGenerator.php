@@ -666,6 +666,7 @@ trait CallArgumentGenerator
                     continue;
                 }
                 $value = $this->parseOrderedDynamicCallArgValue($arg, $i, $lastHoistingArgIndex);
+                $value = $this->wrapWeakModeInternalArg($value, $arg, $funcName, $className, $i);
                 $this->addPositionalCallArg($value, $arrayArgsVar, $list_args, $forceArrayArgs);
             }
 
@@ -692,6 +693,61 @@ trait CallArgumentGenerator
         } finally {
             array_pop($this->context->typedRefBridgeScopes);
         }
+    }
+
+    /**
+     * Without declare(strict_types=1), a scalar argument of an internal
+     * function converts to the declared scalar parameter type (PHP's weak
+     * mode). Zend decides strictness from the calling frame, which for a
+     * compiled caller is not the real call site, so convert here.
+     */
+    private function wrapWeakModeInternalArg(string $value, Node\Arg $arg, string $funcName, string $className, int $argIndex): string
+    {
+        if ($this->fileStrictTypes || $funcName === '' || $className === self::DYNAMIC_CALLED_CLASS) {
+            return $value;
+        }
+        if ($this->getAotCallArgInfo($funcName, $className, $argIndex) !== null) {
+            return $value;
+        }
+        $param = $className !== ''
+            ? Reflection::getClassMethodParameter($className, $funcName, $argIndex)
+            : Reflection::getFunctionParameter($funcName, $argIndex);
+        if ($param === null || $param->isPassedByReference()) {
+            return $value;
+        }
+        $type = $param->getType();
+        if ($type instanceof \ReflectionNamedType) {
+            $members = [$type];
+        } elseif ($type instanceof \ReflectionUnionType) {
+            $members = $type->getTypes();
+        } else {
+            return $value;
+        }
+        $argType = $this->detectTypeOfExpr($arg->value);
+        $masks = [];
+        foreach ($members as $member) {
+            if (!$member instanceof \ReflectionNamedType) {
+                continue;
+            }
+            [$mask, $static] = match ($member->getName()) {
+                'int' => ['MAY_BE_LONG', Type::INT],
+                'float' => ['MAY_BE_DOUBLE', Type::FLOAT],
+                'string' => ['MAY_BE_STRING', Type::STR],
+                'bool' => ['MAY_BE_BOOL', Type::BOOL],
+                default => ['', ''],
+            };
+            if ($mask === '') {
+                continue;
+            }
+            if ($argType === $static) {
+                return $value; // already the declared scalar type
+            }
+            $masks[$mask] = true;
+        }
+        if ($masks === [] || in_array($argType, [Type::ARRAY, Type::OBJECT], true)) {
+            return $value;
+        }
+        return 'php::coerceArgWeak(' . $value . ', ' . implode(' | ', array_keys($masks)) . ')';
     }
 
     private function isExistingReferenceCallArg(Node\Arg $arg): bool
