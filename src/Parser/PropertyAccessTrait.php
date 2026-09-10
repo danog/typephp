@@ -114,9 +114,9 @@ trait PropertyAccessTrait
                 . $object . ', ' . $property . ', php::FakeScopeGuard::current(), php::AttrMode::Get)';
         }
         if ($this->class && !($this->classDef?->trait)) {
-            return 'typephp_read_property_scoped('
+            return 'typephp_read_property_scoped_cached('
                 . $object . ', ' . $property . ', ' . $this->getLocalClassEntryPtr($this->getFullClassName())
-                . ', php::AttrMode::Get)';
+                . ', php::AttrMode::Get, ' . ($cache ?? $this->getPropertyAccessCache()) . ')';
         }
         if ($cache !== null) {
             return 'typephp_read_property_cached('
@@ -1268,9 +1268,9 @@ trait PropertyAccessTrait
             // inside a class the read carries the class scope, so private and
             // protected properties of the receiver (another instance of this
             // class or a parent) are visible as in PHP
-            $getProperty = 'typephp_read_property_scoped('
+            $getProperty = 'typephp_read_property_scoped_cached('
                 . $objectVar . ', ' . $id . ', ' . $this->getLocalClassEntryPtr($this->getFullClassName()) . ', '
-                . $attrMode . ')';
+                . $attrMode . ', ' . $this->getPropertyAccessCache() . ')';
         } elseif ($this->isIdExpr($property) && !$this->isNativePropertyAccess($expr)) {
             $getProperty = 'typephp_read_property_cached('
                 . $objectVar . ', ' . $id . ', ' . $attrMode . ', '
