@@ -69,7 +69,7 @@ trait ClassConstantValueTrait
                     : $value;
             }
         }
-        [$inheritedFound, $inherited] = $this->resolveInheritedClassConst($class, $name);
+        [$inheritedFound, $inherited] = $this->resolveInheritedClassConst($class, $name, $expr);
         if ($inheritedFound) {
             return $inherited;
         }
@@ -86,10 +86,18 @@ trait ClassConstantValueTrait
     }
 
     /** @return array{bool, mixed} */
-    protected function resolveInheritedClassConst(string $class, string $name): array
+    protected function resolveInheritedClassConst(string $class, string $name, ?NodeAbstract $origin = null): array
     {
         $current = ltrim($class, '\\');
         $visited = [];
+        // a constant declared by an interface (`I::C`, or inherited by an implementing class)
+        if ($this->hasInterface($current)) {
+            $interfaceConstant = $this->findCompileTimeInterfaceConstant($current, $name);
+            if ($interfaceConstant !== null) {
+                [$interfaceDef, $constantDef] = $interfaceConstant;
+                return [true, $this->evaluateCompileTimeClassConstant($origin ?? $constantDef->valueExpr, $interfaceDef, $constantDef, $name, $interfaceDef)];
+            }
+        }
         while ($current !== '' && $current !== '\\' && !isset($visited[strtolower($current)])) {
             $visited[strtolower($current)] = true;
             if ($this->hasClass($current)) {
@@ -101,6 +109,13 @@ trait ClassConstantValueTrait
                     }
                     if ($constDef->class !== '' && defined($constDef->class . '::' . $name)) {
                         return [true, constant($constDef->class . '::' . $name)];
+                    }
+                }
+                foreach ($classDef->implements as $interface) {
+                    $interfaceConstant = $this->findCompileTimeInterfaceConstant($interface, $name);
+                    if ($interfaceConstant !== null) {
+                        [$interfaceDef, $constantDef] = $interfaceConstant;
+                        return [true, $this->evaluateCompileTimeClassConstant($origin ?? $constantDef->valueExpr, $interfaceDef, $constantDef, $name, $interfaceDef)];
                     }
                 }
                 $current = $classDef->extends;
