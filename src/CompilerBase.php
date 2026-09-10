@@ -3324,7 +3324,18 @@ class CompilerBase implements PropertyAccessContext
                     'Expr_BinaryOp_BitwiseOr',
                     'Expr_BinaryOp_BitwiseXor',
                 ], true)) {
-                    // bitwise operators convert their operands to int
+                    // `&`, `|`, `^` on two strings operate on the bytes and yield a string
+                    if ($leftType === Type::STR && $rightType === Type::STR
+                        && $exprType !== 'Expr_BinaryOp_ShiftLeft' && $exprType !== 'Expr_BinaryOp_ShiftRight'
+                    ) {
+                        return Type::STR;
+                    }
+                    if ($leftType === Type::VAR || $rightType === Type::VAR
+                        || $leftType === Type::REF || $rightType === Type::REF
+                    ) {
+                        return Type::VAR;
+                    }
+                    // otherwise bitwise operators convert their operands to int
                     return Type::INT;
                 }
                 if ($leftType === Type::FLOAT || $rightType === Type::FLOAT) {
