@@ -592,7 +592,8 @@ trait AssignOpTrait
                 } elseif (($leftClass = $this->getDeclaredObjectType($var)) !== '') {
                     if ($this->isObjectClassStaticallyAssignableTo($rightClass, $leftClass)) {
                         // A child object can be assigned to a parent typed object.
-                    } elseif ($this->isInterface($rightClass) || $this->isAbstractClass($rightClass) || $this->isObjectClassStaticallyAssignableTo($leftClass, $rightClass)) {
+                    } elseif ($this->isObjectClassStaticallyAssignableTo($leftClass, $rightClass)) {
+                        // The declared (parent/interface/abstract) type of the value may hold the local's concrete class: keep it with a runtime check. An unrelated class is a conflict.
                         if ($this->isKnownConcreteObjectExpr($right, $rightClass)) {
                             $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
                         }
@@ -687,7 +688,8 @@ trait AssignOpTrait
                     if ($leftClass !== '' and $rightClass !== '') {
                         if ($this->isObjectClassStaticallyAssignableTo($rightClass, $leftClass)) {
                             // A child object can be assigned to a parent typed object.
-                        } elseif ($this->isInterface($rightClass) || $this->isAbstractClass($rightClass) || $this->isObjectClassStaticallyAssignableTo($leftClass, $rightClass)) {
+                        } elseif ($this->isObjectClassStaticallyAssignableTo($leftClass, $rightClass)) {
+                        // The declared (parent/interface/abstract) type of the value may hold the local's concrete class: keep it with a runtime check. An unrelated class is a conflict.
                             $runtimeObjectAssignClass = $leftClass;
                         } else {
                             $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
