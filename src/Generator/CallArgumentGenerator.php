@@ -630,6 +630,16 @@ trait CallArgumentGenerator
                             $this->addPositionalCallArg('&' . $name, $arrayArgsVar, $list_args, $forceArrayArgs);
                             continue;
                         }
+                        if (in_array($rawType, [Type::INT, Type::FLOAT, Type::STR, Type::BOOL, Type::ARRAY], true)) {
+                            // a fixed-typed local cannot be bound to a reference the
+                            // callee may expect: regenerate with dynamic storage
+                            $this->localTypeConflict(
+                                $arg,
+                                $name,
+                                'Variable $' . $this->unescapeVarName($name) . ' of type ' . $rawType
+                                    . ' is passed to a callee whose by-reference parameters are unknown',
+                            );
+                        }
                     }
                 }
                 $value = $this->parseOrderedDynamicCallArgValue($arg, $i, $lastHoistingArgIndex);
