@@ -981,11 +981,14 @@ trait CallArgumentGenerator
             $rawType = $this->getRawVarType($name);
             $valueType = Type::getReferencedType($rawType);
             if (Type::getReferenceType($valueType) !== null) {
-                // The callee takes a dynamic reference (untyped, nullable or
-                // union by-reference parameter) and may store a value of
-                // another type (`?array &$out = null` assigned null): a
-                // fixed-typed local cannot be bridged, regenerate the
-                // function with dynamic storage for it.
+                if (Type::isTypedRefType($rawType)) {
+                    // a typed by-reference parameter constrains the reference in PHP too
+                    return '&' . $this->getDynamicTypedRefBridge($name, $valueType) . '.ref()';
+                }
+                // The callee is unknown and may store a value of another type
+                // (`?array &$out = null` assigned null): a fixed-typed local
+                // cannot be bridged, regenerate the function with dynamic
+                // storage for it.
                 $this->localTypeConflict(
                     $arg,
                     $name,

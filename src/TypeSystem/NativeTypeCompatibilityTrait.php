@@ -171,6 +171,20 @@ trait NativeTypeCompatibilityTrait
         return false;
     }
 
+    /**
+     * Whether a by-reference parameter with the dynamic php::Ref ABI may
+     * store a value of another type than the caller's variable holds
+     * (untyped, mixed, nullable, union or intersection declarations).
+     */
+    protected function dynamicRefParamMayRetype(ArgInfo $argInfo): bool
+    {
+        return $argInfo->undeclared
+            || $argInfo->explicitMixed
+            || $argInfo->nullable
+            || $argInfo->typeNode instanceof \PhpParser\Node\UnionType
+            || $argInfo->typeNode instanceof \PhpParser\Node\IntersectionType;
+    }
+
     protected function getTypeConvertedArg(
         Node\Arg $arg,
         ArgInfo $argInfo,
@@ -318,6 +332,13 @@ trait NativeTypeCompatibilityTrait
                 $rawType = $this->getRawVarType($var);
                 $valueType = Type::getReferencedType($rawType);
                 if (Type::getReferenceType($valueType) !== null) {
+                    // A typed by-reference parameter of the current function
+                    // constrains the reference in PHP as well (a write of
+                    // another type is a TypeError there too), and a callee
+                    // parameter declared with one type keeps it: bridge.
+                    if (Type::isTypedRefType($rawType) || !$this->dynamicRefParamMayRetype($argInfo)) {
+                        return $this->getDynamicTypedRefBridge($var, $valueType) . '.ref()';
+                    }
                     $this->localTypeConflict(
                         $arg,
                         $var,
