@@ -353,9 +353,14 @@ trait SelectionExpressionTrait
             $this->context->beforeStmtLines[] = $comment .
                 $tmpVar . ' = ' . $condExpr . ' ? ' . $leftExpr . ' : ' . $rightExpr . ';';
         }
-        $expr->setAttribute('replace', $tmpVar);
+        // the temporary is a Variant; the expression is typed after its branches
+        $resultType = $this->detectTypeOfExpr($expr);
+        $result = in_array($resultType, [Type::INT, Type::FLOAT, Type::STR, Type::BOOL], true)
+            ? $this->convertExprFromType($resultType, $tmpVar)
+            : $tmpVar;
+        $expr->setAttribute('replace', $result);
 
-        return $tmpVar;
+        return $result;
     }
 
     protected function parseNativeValueSelection(Expr $left, Expr $right, string $nativeClass): string
