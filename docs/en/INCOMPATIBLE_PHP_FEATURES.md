@@ -108,16 +108,22 @@ incompatible with or more restrictive than standard PHP.
   becomes a C++ `T&`, and an exact `int/string/float/bool/array &$arg` on a
   statically resolved TypePHP call also uses `T&` without boxing or allocating a
   Zend reference. Rebinding, conditional/loop-local first binding, `unset`,
-  by-reference Closure capture, returning the local by reference, or storing the
-  reference in a property/array/global is rejected because the C++ reference may
-  not escape or change its target.
+  returning the local by reference, or storing the reference in a
+  property/array/global is rejected because the C++ reference may not escape or
+  change its target. Closure `use (&$value)` is an explicit degradation boundary:
+  before parsing the function body, the compiler marks the local for `php::Var`
+  storage starting at its first assignment, so an escaping Closure can retain a
+  normal Zend reference. A strongly typed parameter keeps its original call ABI
+  and is copied into a same-named local `php::Var` slot at function entry.
 - Dynamic calls and Closure calls still require explicit `std::ref()` / `toRef()`.
   TypePHP creates a call-scoped Zend reference, validates its type on write-back,
   and reports an error if dynamic code retains it beyond the call. Code requiring
   unrestricted PHP reference identity should initialize the local with
   `std::any()` and use the existing `php::Var`/`php::Ref` path.
-- Fixed object, resource/stream, high-precision, Native/typed-object, Box, and
-  `std`-container locals cannot be referenced. These values already have
+- Ordinary object, resource/stream, and high-precision locals also degrade to
+  `php::Var` when captured by reference. Native-object and `std`-container locals
+  cannot safely discard their compile-time storage layouts and still cannot be
+  captured this way. These values already have
   handle/reference-like semantics, while rebinding their statically typed local
   slot would weaken the type system. Typed object/static properties remain
   reference-capable because Zend attaches property type sources; PHP array

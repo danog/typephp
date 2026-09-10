@@ -1575,6 +1575,7 @@ trait NativeClassSupportTrait
     protected function getNativeMethodParameterDeclarations(
         FunctionDef $function,
         ?int $parameterCount = null,
+        bool $useDegradedArgumentNames = false,
     ): string
     {
         $args = [];
@@ -1582,6 +1583,12 @@ trait NativeClassSupportTrait
             ? $function->argInfoList
             : array_slice($function->argInfoList, 0, $parameterCount);
         foreach ($arguments as $argument) {
+            if ($useDegradedArgumentNames
+                && isset($this->context->varTypeDegradations[$argument->name])
+            ) {
+                $argument = clone $argument;
+                $argument->name = $this->getDegradedArgumentStorageName($argument->name);
+            }
             if ($argument->variadic) {
                 $declaration = Type::ARRAY . ' ' . $argument->name;
             } else {

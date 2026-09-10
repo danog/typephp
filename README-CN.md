@@ -228,6 +228,38 @@ string(16) "Linux ..."
 > `main(int $argc, array $argv)` 以接收命令行参数，且必须返回 `void`。全局作用域
 > 不允许可执行语句；可执行代码必须位于函数或方法内。
 
+### 无 VM 的 Nano 原生程序
+
+使用 `--nano` 可将单个 PHP 源文件与 PHP Nano、PHPX 源码整体编译。产物不链接
+`libphp`，也不包含 Zend opcode 解释器：
+
+```bash
+./bin/tpc.php --nano examples/hello.php
+./hello
+```
+
+默认可执行文件生成在执行 `tpc` 时的当前目录；普通模式与 Nano 模式共用
+`build` 目录保存生成代码、目标文件等中间产物。可使用 `-o` 显式修改输出路径。
+
+PHP 与 Composer 仅用于编译期。在 Linux、macOS、iOS、Android 上，生成的程序
+使用静态选定的 Nano 运行时及仅文件模式的 stream。Native Nano 可使用 C11、
+C++17 与 POSIX.1-2008，但依然不提供 socket、DNS、网络、远程 stream、动态 PHP
+加载及进程执行能力。WASI 是更小的能力子集，直接调用目标不支持的 API 会在
+编译期报错。
+
+所有平台的 `--nano` 都会拒绝 `eval`、`include`、`include_once`、`require`、
+`require_once` 等 VM 入口以及匿名类。
+
+Windows 的差异在于构建后端：即使指定 `--nano`，也仍走原有的宿主机编译、链接
+流程，通过 import library 连接 `php.dll` 与 `phpx.dll`。Windows 不加载
+`swoole/php-nano`、`swoole/phpx` 的源码清单，也不会把它们的 C/C++ 源文件加入
+项目 `sources`。外部命令 API 与反引号语法依然会被拒绝；请求启动时还会从 Zend
+函数表移除这些命令函数，避免变量函数或回调形式绕过编译期检查。
+
+除运行时 sources、头文件目录、编译宏和链接输入外，Nano 与普通模式共用同一套
+命令行参数解析、TypePHP 代码生成、并行任务调度、编译进度条、输出路径规则以及
+`main(int $argc, array $argv)` 参数语义。
+
 ## 编译模式
 
 TypePHP 支持三种构建模式，通过 `-m` / `--mode` 选择：

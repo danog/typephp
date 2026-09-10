@@ -445,7 +445,7 @@ trait MethodCallTrait
             }
             if ($type === Type::BIGFLOAT) {
                                 if ($argType === Type::INT) {
-                    return 'php::toBigFloat(' . $valueExpr . ')';
+                    return 'php::toBigFloat(php::toInt(' . $valueExpr . '))';
                 }
                 if ($argType === Type::FLOAT) {
                     return 'php::toBigFloat(' . $valueExpr . ')';

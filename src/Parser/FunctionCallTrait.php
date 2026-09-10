@@ -142,8 +142,13 @@ trait FunctionCallTrait
                     "Native classes do not support runtime class introspection; use {$replacement}",
                 );
             }
+            // Capability policy is determined by the target, not by the
+            // extensions loaded into the build-time PHP process. Otherwise a
+            // forbidden direct call could bypass validation merely because
+            // that host PHP does not expose the function.
+            $this->assertWasiFunctionSupported($expr, $globalName);
+            $this->assertNanoFunctionSupported($expr, $globalName);
             if ($this->isInternalFunction($globalName)) {
-                $this->assertWasiFunctionSupported($expr, $globalName);
                 $this->markInternalFunctionCallbackCall($globalName, $expr->args);
             }
             if (in_array($globalName, Constants::UNSUPPORTED_FUNCTIONS, true)) {

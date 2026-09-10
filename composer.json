@@ -11,6 +11,7 @@
     }
   ],
   "bin": [
+    "bin/tpc",
     "bin/tpc.php"
   ],
   "require": {
@@ -22,6 +23,7 @@
     "symfony/var-dumper": "^8.0",
     "symfony/yaml": "^8.0",
     "swoole/phpx": "~2.8.0",
+    "swoole/php-nano": "^8.6@dev",
     "ajaxray/ansikit": "^0.3",
     "ext-dom": "*"
   },

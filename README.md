@@ -254,6 +254,44 @@ string(16) "Linux ..."
 > arguments, and must return `void`. Top-level executable statements are not
 > allowed; executable code belongs in a function or method.
 
+### VM-free Nano executable
+
+Use `--nano` to compile one PHP source file together with PHP Nano and PHPX
+sources. The result does not link `libphp` and contains no Zend opcode
+interpreter:
+
+```bash
+./bin/tpc.php --nano examples/hello.php
+./hello
+```
+
+By default, the executable is emitted in the directory where `tpc` was invoked.
+Normal and Nano builds share the `build` directory for generated code, objects,
+and other intermediate files. Use `-o` to select a different output path.
+
+PHP and Composer remain build-time tools. On Linux, macOS, iOS, and Android,
+the generated program uses the statically selected Nano runtime and its
+file-only stream layer. Native Nano may use C11, C++17, and POSIX.1-2008, but
+socket/DNS/network, remote streams, dynamic PHP loading, and process execution
+remain unavailable. WASI is a smaller subset; direct calls to APIs missing from
+that target are compile-time errors.
+
+On every platform, `--nano` rejects the VM entry paths `eval`, `include`,
+`include_once`, `require`, and `require_once`, as well as anonymous classes.
+
+Windows uses a different build backend even when `--nano` is specified: it keeps
+the existing host compile/link pipeline and connects to `php.dll` and `phpx.dll`
+through their import libraries. It does not load the `swoole/php-nano` or
+`swoole/phpx` source manifests, nor append their C/C++ files to project `sources`.
+External-command APIs and backtick syntax are still rejected. Those command
+functions are also removed from the Zend function table at request startup, so
+indirect variable/callback calls cannot bypass the policy.
+
+Except for runtime sources, include directories, compile definitions, and link
+inputs, Nano and normal mode share command-line parsing, TypePHP code generation,
+parallel scheduling, the compilation progress bar, output path rules, and the
+`main(int $argc, array $argv)` argument contract.
+
 ## Compilation Modes
 
 TypePHP supports three build modes, selected with `-m` / `--mode`:
