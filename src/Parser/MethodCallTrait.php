@@ -1125,6 +1125,27 @@ trait MethodCallTrait
 
         if ($this->isNameExpr($expr->class)
             && $this->isIdExpr($expr->name)
+            && !$expr->isFirstClassCallable()
+            && strtolower(ltrim($this->parseIdentifier($expr->class), '\\')) === 'fiber'
+        ) {
+            // A TypePHP generator body runs in its own fiber, while PHP runs it
+            // in the consumer's fiber: route the Fiber API through the runtime
+            // so that generators stay transparent (event loops awaiting inside
+            // a generator body).
+            $fiberMethod = strtolower($expr->name->toString());
+            if ($fiberMethod === 'getcurrent' && $expr->args === []) {
+                return 'typephp_logical_fiber_current_object()';
+            }
+            if ($fiberMethod === 'suspend' && count($expr->args) <= 1
+                && ($expr->args === [] || (!$expr->args[0]->unpack && $expr->args[0]->name === null))
+            ) {
+                $value = $expr->args === [] ? 'php::null' : $this->parseExprAsValue($expr->args[0]->value);
+                return 'typephp_logical_fiber_suspend(' . $value . ')';
+            }
+        }
+
+        if ($this->isNameExpr($expr->class)
+            && $this->isIdExpr($expr->name)
             && strtolower(ltrim($expr->class->toString(), '\\')) === 'closure'
             && in_array(strtolower($expr->name->toString()), ['bind', 'bindto', 'call'], true)) {
             $closureMethod = $expr->name->toString();
