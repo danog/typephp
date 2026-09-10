@@ -3579,6 +3579,7 @@ CODE;
                 if (!($declare->value instanceof Node\Scalar\Int_) or $declare->value->value !== 1) {
                     $this->fatalError($v, 'TypePHP always uses strict types; declare(strict_types=0) is not allowed');
                 }
+                $this->fileStrictTypes = true;
             } else {
                 $this->fatalError($v, 'declare(' . $key . '=' . $value . ') is not supported');
             }

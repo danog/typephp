@@ -526,6 +526,12 @@ class CompilerBase implements PropertyAccessContext
      */
     protected bool $openWorld = false;
 
+    /**
+     * declare(strict_types=1) of the file being converted. Without it, scalar
+     * parameter/return types coerce like PHP's weak mode instead of throwing.
+     */
+    protected bool $fileStrictTypes = false;
+
     public function isOpenWorld(): bool
     {
         return $this->openWorld;
@@ -1260,6 +1266,7 @@ class CompilerBase implements PropertyAccessContext
     protected function resetFile(): void
     {
         $this->indentLevel = 0;
+        $this->fileStrictTypes = false;
         $this->varIntTypes = false;
         $this->decimalTypes = false;
         $this->bigintTypes = false;

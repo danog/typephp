@@ -367,6 +367,21 @@ trait NativeTypeCompatibilityTrait
             );
         }
 
+        if (!$this->fileStrictTypes
+            && $this->isStrictScalarType($argInfo->type)
+            && in_array(Type::getReferencedType($type), [Type::INT, Type::FLOAT, Type::STR, Type::BOOL], true)
+            && Type::getReferencedType($type) !== Type::getReferencedType($argInfo->type)
+        ) {
+            // weak mode: a scalar of another type converts at runtime following
+            // PHP's coercion rules (numeric strings, int/float, bool)
+            return $this->genStrictScalarArgConversion(
+                $argInfo,
+                Type::VAR . '(' . $expr . ')',
+                $callableName,
+                (string) ($argIndex + 1)
+            );
+        }
+
         $this->checkVarAssignExpr($arg, $argInfo->type, $type);
 
         if ($argInfo->type === Type::VAR && $this->isVarExpr($arg->value)) {

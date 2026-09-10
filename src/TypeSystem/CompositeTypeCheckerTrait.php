@@ -25,6 +25,14 @@ trait CompositeTypeCheckerTrait
         if ($relation !== self::COMPOSITE_TYPE_MISMATCH) {
             return $relation;
         }
+        // Without declare(strict_types=1) a scalar converts to a scalar member
+        // of the type at runtime (PHP's weak mode); keep the runtime check.
+        if (!$this->fileStrictTypes
+            && in_array($this->detectTypeOfExpr($value), [Type::INT, Type::FLOAT, Type::STR, Type::BOOL], true)
+            && $this->typeCheckScalarMask($typeCheck) !== ''
+        ) {
+            return self::COMPOSITE_TYPE_UNKNOWN;
+        }
 
         $valueType = $this->staticTypeNameOfExpr($value);
         $this->fatalError($errorNode, "Cannot assign {$valueType} to {$context} of type `{$typeStr}`");

@@ -62,6 +62,66 @@ trait TypeCheckGenerator
         };
     }
 
+    /** Zend MAY_BE_* mask of a strict scalar type (coercive mode) */
+    protected function strictScalarTypeMask(string $type): string
+    {
+        $type = Type::getReferencedType($type);
+        return match ($type) {
+            Type::INT => 'MAY_BE_LONG',
+            Type::FLOAT => 'MAY_BE_DOUBLE',
+            Type::BOOL => 'MAY_BE_BOOL',
+            Type::STR => 'MAY_BE_STRING',
+            default => throw new \LogicException('Not a strict scalar type: ' . $type),
+        };
+    }
+
+    /**
+     * Zend MAY_BE_* mask of the scalar members of a composite type check
+     * ('' when the type has no scalar member).
+     */
+    protected function typeCheckScalarMask(array $typeCheck): string
+    {
+        $masks = [];
+        foreach ($typeCheck as $entry) {
+            $mask = match ($entry['kind'] ?? '') {
+                'isInt' => 'MAY_BE_LONG',
+                'isFloat' => 'MAY_BE_DOUBLE',
+                'isBool' => 'MAY_BE_BOOL',
+                'isTrue' => 'MAY_BE_TRUE',
+                'isFalse' => 'MAY_BE_FALSE',
+                'isString' => 'MAY_BE_STRING',
+                default => '',
+            };
+            if ($mask !== '') {
+                $masks[$mask] = true;
+            }
+        }
+        return implode(' | ', array_keys($masks));
+    }
+
+    /**
+     * `if (!(cond)) { [coerce or] throw }` for a scalar/composite check.
+     * In coercive mode (no declare(strict_types=1)) a scalar value is
+     * converted in place following PHP's weak typing rules before failing.
+     */
+    private function genTypeCheckFailure(string $orExpr, string $valueExpr, string $mask, string $throwExpr): string
+    {
+        $code = $this->getIndent() . 'if (UNEXPECTED(!(' . $orExpr . '))) {' . PHP_EOL;
+        $this->indentLevel++;
+        if (!$this->fileStrictTypes && $mask !== '') {
+            $code .= $this->getIndent() . 'if (!php::coerceScalarArg(' . $valueExpr . ', ' . $mask . ')) {' . PHP_EOL;
+            $this->indentLevel++;
+            $code .= $this->getIndent() . $throwExpr . ';' . PHP_EOL;
+            $this->indentLevel--;
+            $code .= $this->getIndent() . '}' . PHP_EOL;
+        } else {
+            $code .= $this->getIndent() . $throwExpr . ';' . PHP_EOL;
+        }
+        $this->indentLevel--;
+        $code .= $this->getIndent() . '}' . PHP_EOL;
+        return $code;
+    }
+
     protected function genStrictScalarCondition(string $valueExpr, string $type): string
     {
         $type = Type::getReferencedType($type);
@@ -91,13 +151,12 @@ trait TypeCheckGenerator
             . $this->getLiteralString($paramName) . ', '
             . $this->getLiteralString($this->strictScalarTypeName($argInfo->type)) . ')';
 
-        $code = $this->getIndent() . 'if (UNEXPECTED(!('
-            . $this->genStrictScalarCondition($valueExpr, $argInfo->type) . '))) {' . PHP_EOL;
-        $this->indentLevel++;
-        $code .= $this->getIndent() . $throwExpr . ';' . PHP_EOL;
-        $this->indentLevel--;
-        $code .= $this->getIndent() . '}' . PHP_EOL;
-        return $code;
+        return $this->genTypeCheckFailure(
+            $this->genStrictScalarCondition($valueExpr, $argInfo->type),
+            $valueExpr,
+            $this->strictScalarTypeMask($argInfo->type),
+            $throwExpr,
+        );
     }
 
     protected function genStrictScalarArgConversion(
@@ -106,11 +165,12 @@ trait TypeCheckGenerator
         string $callableName,
         string $argNoExpr
     ): string {
+        $suffix = $this->fileStrictTypes ? 'Exact' : 'Coerce';
         $helper = match ($argInfo->type) {
-            Type::INT => 'php::toIntArgExact',
-            Type::FLOAT => 'php::toFloatArgExact',
-            Type::BOOL => 'php::toBoolArgExact',
-            Type::STR => 'php::toStringArgExact',
+            Type::INT => 'php::toIntArg' . $suffix,
+            Type::FLOAT => 'php::toFloatArg' . $suffix,
+            Type::BOOL => 'php::toBoolArg' . $suffix,
+            Type::STR => 'php::toStringArg' . $suffix,
             default => throw new \LogicException('Not a strict scalar type: ' . $argInfo->type),
         };
         $paramName = $argInfo->phpName ?: $this->unescapeVarName($argInfo->name);
@@ -127,16 +187,15 @@ trait TypeCheckGenerator
         }
 
         $fnName = $this->getTypeCheckCallableName();
-        $code = $this->getIndent() . 'if (UNEXPECTED(!('
-            . $this->genStrictScalarCondition($valueExpr, $returnType) . '))) {' . PHP_EOL;
-        $this->indentLevel++;
-        $code .= $this->getIndent() . 'php::throwReturnTypeError(' . $valueExpr . ', '
+        return $this->genTypeCheckFailure(
+            $this->genStrictScalarCondition($valueExpr, $returnType),
+            $valueExpr,
+            $this->strictScalarTypeMask($returnType),
+            'php::throwReturnTypeError(' . $valueExpr . ', '
             . $this->getLiteralString($fnName) . ', '
             . $this->getLiteralString($this->strictScalarTypeName($returnType)) . ', '
-            . $this->escapeBool(true) . ');' . PHP_EOL;
-        $this->indentLevel--;
-        $code .= $this->getIndent() . '}' . PHP_EOL;
-        return $code;
+            . $this->escapeBool(true) . ')',
+        );
     }
 
     protected function buildTypeCheckFromNode(NodeAbstract $typeNode, bool $includeSimpleType = false): array
@@ -386,11 +445,12 @@ trait TypeCheckGenerator
         $throwExpr = $this->genUnionParamTypeErrorExpr($argInfo, $varName, (string) ($argIndex + 1));
 
         $code = $this->genCompositeIntToFloatCoercion($varName, $argInfo->typeCheck);
-        $code .= $this->getIndent() . 'if (UNEXPECTED(!(' . $orExpr . '))) {' . PHP_EOL;
-        $this->indentLevel++;
-        $code .= $this->getIndent() . $throwExpr . ';' . PHP_EOL;
-        $this->indentLevel--;
-        $code .= $this->getIndent() . '}' . PHP_EOL;
+        $code .= $this->genTypeCheckFailure(
+            $orExpr,
+            $varName,
+            $this->typeCheckScalarMask($argInfo->typeCheck),
+            $throwExpr,
+        );
 
         return $code;
     }
@@ -427,9 +487,19 @@ trait TypeCheckGenerator
             $code .= $this->getIndent() . '}' . PHP_EOL;
         }
         $code .= $this->getIndent() . Type::INT . ' ' . $argNoVar . ' = ' . ($argIndex + 1) . ' + ' . $iterVar . '.index();' . PHP_EOL;
+        $mask = $this->fileStrictTypes ? '' : $this->typeCheckScalarMask($argInfo->typeCheck);
         $code .= $this->getIndent() . 'if (UNEXPECTED(!(' . $orExpr . '))) {' . PHP_EOL;
         $this->indentLevel++;
-        $code .= $this->getIndent() . $throwExpr . ';' . PHP_EOL;
+        if ($mask !== '') {
+            $code .= $this->getIndent() . 'if (!php::coerceScalarArg(' . $valueVar . ', ' . $mask . ')) {' . PHP_EOL;
+            $this->indentLevel++;
+            $code .= $this->getIndent() . $throwExpr . ';' . PHP_EOL;
+            $this->indentLevel--;
+            $code .= $this->getIndent() . '}' . PHP_EOL;
+            $code .= $this->getIndent() . $iterVar . '.valueRef() = ' . $valueVar . ';' . PHP_EOL;
+        } else {
+            $code .= $this->getIndent() . $throwExpr . ';' . PHP_EOL;
+        }
         $this->indentLevel--;
         $code .= $this->getIndent() . '}' . PHP_EOL;
         $this->indentLevel--;
@@ -470,13 +540,14 @@ trait TypeCheckGenerator
         $typeStr = $this->functionDef->returnTypeStr;
 
         $code = $this->genCompositeIntToFloatCoercion($varName, $typeCheck);
-        $code .= $this->getIndent() . 'if (UNEXPECTED(!(' . $orExpr . '))) {' . PHP_EOL;
-        $this->indentLevel++;
-        $code .= $this->getIndent() . 'php::throwReturnTypeError(' . $varName . ', '
+        $code .= $this->genTypeCheckFailure(
+            $orExpr,
+            $varName,
+            $this->typeCheckScalarMask($typeCheck),
+            'php::throwReturnTypeError(' . $varName . ', '
             . $this->getLiteralString($fnName) . ', ' . $this->getLiteralString($typeStr) . ', '
-            . $this->escapeBool(false) . ');' . PHP_EOL;
-        $this->indentLevel--;
-        $code .= $this->getIndent() . '}' . PHP_EOL;
+            . $this->escapeBool(false) . ')',
+        );
 
         return $code;
     }
