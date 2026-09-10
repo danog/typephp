@@ -360,6 +360,7 @@ class CompilerBase implements PropertyAccessContext
     public const string PERSISTENT_FUNC_MAP = 'persistent_func_map';
     public const string PERSISTENT_PROP_MAP = 'persistent_property_map';
     public const string NAMESPACE_SEPARATOR = '__';
+    public const string FUNCTION_SEPARATOR = '___';
 
     public const string PREFIX = 'php_';
     protected const string MULTI_RETURN_NAMESPACE = 'typephp::detail';
@@ -1398,7 +1399,27 @@ class CompilerBase implements PropertyAccessContext
         if ($fn) {
             $names[] = $this->escapeName($fn);
         }
+        if ($ns && !$class && $fn) {
+            // A namespaced free function must not share its C++ symbol with a
+            // method of the same name on a class whose namespaced name equals
+            // the function's namespace (`Amp\Future\await()` vs
+            // `Amp\Future::await()`), so functions use a distinct separator.
+            return $names[0] . self::FUNCTION_SEPARATOR . $names[1];
+        }
         return implode(self::NAMESPACE_SEPARATOR, $names);
+    }
+
+    /**
+     * The C++ symbol of a fully qualified (namespaced) function name.
+     */
+    protected function getFunctionSymbol(string $fqName): string
+    {
+        $fqName = ltrim($fqName, '\\');
+        $pos = strrpos($fqName, '\\');
+        if ($pos === false) {
+            return $this->getNativeName($fqName);
+        }
+        return $this->getNativeName(substr($fqName, $pos + 1), substr($fqName, 0, $pos));
     }
 
     /**
@@ -3604,16 +3625,16 @@ class CompilerBase implements PropertyAccessContext
         } else {
             $possibleFunctionNames = [$this->escapeName($funcName)];
             if ($this->namespace) {
-                $possibleFunctionNames[] = $this->escapeNamespace($this->namespace) . self::NAMESPACE_SEPARATOR . $this->escapeName($funcName);
+                $possibleFunctionNames[] = $this->getNativeName($funcName, $this->namespace);
             }
             if (isset($this->useFunctions[$funcName])) {
-                $possibleFunctionNames[] = $this->escapeNamespace($this->useFunctions[$funcName]);
+                $possibleFunctionNames[] = $this->getFunctionSymbol($this->useFunctions[$funcName]);
             }
         }
 
         foreach ($possibleFunctionNames as $nativeFunc) {
             if (str_contains($nativeFunc, '\\')) {
-                $nativeFunc = $this->escapeNamespace($nativeFunc);
+                $nativeFunc = $this->getFunctionSymbol($nativeFunc);
             }
             $this->checkFunction($nativeFunc);
             if ($this->hasFunction($nativeFunc) && !$this->getFunction($nativeFunc)->method) {

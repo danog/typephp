@@ -506,7 +506,17 @@ class Preprocessor extends CompilerBase
                 $this->resetMethod();
                 $this->resetClass();
                 $this->resetNamespace();
-                $this->composeTraitDeclarationStatementList($this->preparedFileAsts[$path]);
+                try {
+                    $this->composeTraitDeclarationStatementList($this->preparedFileAsts[$path]);
+                } catch (\Throwable $e) {
+                    $collect = getenv('TYPEPHP_COLLECT_ERRORS');
+                    if (!is_string($collect) || $collect === '') {
+                        throw $e;
+                    }
+                    // Collect mode: report and keep composing the other files.
+                    file_put_contents($collect, 'COMPOSE: ' . get_class($e) . ': ' . $e->getMessage() . ' in ' . $path . "\n", FILE_APPEND);
+                    echo ' compose error: ' . $e->getMessage() . "\n skip: " . $path . "\n";
+                }
             }
             $this->traitDeclarationsComposed = true;
             // Trait methods are real methods of their consuming classes and

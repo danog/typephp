@@ -128,7 +128,7 @@ trait MagicMethodDetector
         } elseif ($nameLower == '__serialize') {
             if ($returnTypeUndeclared) {
                 $fnDef->returnType = Type::ARRAY;
-            } elseif ($fnDef->returnType !== Type::ARRAY) {
+            } elseif ($fnDef->returnType !== Type::ARRAY && $fnDef->returnType !== Type::VOID) {
                 $this->fatalError($v, 'Method ' . $methodName . '() must return array');
             }
         } elseif ($nameLower == '__unserialize') {
