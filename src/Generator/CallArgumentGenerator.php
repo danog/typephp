@@ -601,6 +601,28 @@ trait CallArgumentGenerator
                         continue;
                     }
                 }
+                // The callee is unknown at compile time (`$callable(...)`,
+                // `$mixed->method()`): PHP decides by-reference passing at
+                // runtime from the callee's signature. A dynamic local is
+                // passed as a reference; a by-value parameter dereferences it.
+                if (($className === self::DYNAMIC_CALLED_CLASS || ($funcName === '' && $className === ''))
+                    && $arg->value instanceof Node\Expr\Variable
+                    && is_string($arg->value->name)
+                    && $arg->value->name !== 'this'
+                ) {
+                    $name = $this->parseIdentifier($arg->value);
+                    if ($this->hasVar($name) && !$this->hasStaticVar($name)) {
+                        $rawType = $this->getRawVarType($name);
+                        if ($rawType === Type::VAR) {
+                            $this->addPositionalCallArg($name . '.toReference()', $arrayArgsVar, $list_args, $forceArrayArgs);
+                            continue;
+                        }
+                        if ($rawType === Type::REF) {
+                            $this->addPositionalCallArg('&' . $name, $arrayArgsVar, $list_args, $forceArrayArgs);
+                            continue;
+                        }
+                    }
+                }
                 $value = $this->parseOrderedDynamicCallArgValue($arg, $i, $lastHoistingArgIndex);
                 $this->addPositionalCallArg($value, $arrayArgsVar, $list_args, $forceArrayArgs);
             }
