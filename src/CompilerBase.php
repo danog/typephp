@@ -2345,6 +2345,16 @@ class CompilerBase implements PropertyAccessContext
                 ) {
                     return $property->class;
                 }
+            } elseif ($receiverClass !== '' && $this->hasClass($receiverClass)) {
+                // a property declared with a class type on a compiled class
+                $property = $this->findCompiledClassPropertyDef($this->getClass($receiverClass), $expr->name->toString());
+                if ($property !== null
+                    && $property->type === Type::OBJECT
+                    && $property->class !== ''
+                    && ($this->hasClass($property->class) || $this->hasInterface($property->class))
+                ) {
+                    return $property->class;
+                }
             }
         }
         if ($this->isArrayDimFetch($expr) and $this->isStdContainerExpr($expr)) {
@@ -5101,6 +5111,23 @@ class CompilerBase implements PropertyAccessContext
     protected function isNativePropertyAccess(NodeAbstract $expr): bool
     {
         return $this->getNativePropertyAccess($expr) !== null;
+    }
+
+    /**
+     * The declaration of a property of a compiled class, searching the parents.
+     */
+    protected function findCompiledClassPropertyDef(ClassDef $classDef, string $propertyName): ?PropertyDef
+    {
+        $current = $classDef;
+        while (true) {
+            if ($current->hasProperty($propertyName)) {
+                return $current->getProperty($propertyName);
+            }
+            if (!$current->extends || !$this->hasClass($current->extends)) {
+                return null;
+            }
+            $current = $this->getClass($current->extends);
+        }
     }
 
     protected function getNativePropertyDef(NodeAbstract $expr): ?PropertyDef

@@ -558,6 +558,11 @@ trait MethodCallTrait
             $object = empty($expr->args)
                 ? $this->parseIdentifier($expr->var)
                 : $this->parseOrderedOperand($expr->var, false);
+            if ($receiverClass !== '' && ($this->hasClass($receiverClass) || $this->hasInterface($receiverClass))) {
+                // e.g. `$codebase->methods->foo()` with a typed property:
+                // the declared class resolves the method (and its by-reference parameters)
+                $class = $receiverClass;
+            }
             // Preserve the receiver expression boundary for no-argument
             // calls. Without these parentheses, C++ member access binds more
             // tightly than assignment, so `($b = $a)->method()` was emitted
