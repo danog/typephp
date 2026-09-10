@@ -644,6 +644,8 @@ trait MethodCallTrait
                 && isset(self::KEYWORD_METHOD_MAP[$methodName])
                 && !$expr->getAttribute('nativeKeywordCall', false)
                 && !$this->userClassDeclaresMethod($class, $methodName)
+                // a keyword that takes no parameters, called with arguments, is a user method
+                && (isset(self::KEYWORD_METHOD_WITH_ARGUMENTS[$methodName]) || $expr->args === [])
             ) {
                 if ($this->isVarExpr($expr->var)) {
                     $this->assertStdContainerDoesNotEscapeNativeObjects($expr, $object);

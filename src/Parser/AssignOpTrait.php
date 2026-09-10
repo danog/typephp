@@ -1270,7 +1270,11 @@ trait AssignOpTrait
             );
             return $leftExpr . ' = ' . $value;
         }
-        if ($this->isFixedObjectProp($def) && $rightType !== Type::VAR && !$this->canAssignStaticTypeToObjectProperty($def, $rightType)) {
+        if ($this->isFixedObjectProp($def)
+            && $rightType !== Type::VAR
+            && $rightType !== Type::REF
+            && !$this->canAssignStaticTypeToObjectProperty($def, $rightType)
+        ) {
             $this->fatalError(
                 $node->var,
                 'Cannot assign ' . $this->getPropertyAssignmentTypeName($rightType)
@@ -1729,6 +1733,9 @@ trait AssignOpTrait
             ? $this->getNativePropertyAccess($left->var)?->getPropertyDef()
             : null;
         $offsetWriteOnObject = $propertyDef !== null && ($propertyDef->type === Type::OBJECT || $propertyDef->class !== '');
+        if ($offsetWriteOnObject) {
+            $left->var->setAttribute('readonlyOffsetWrite', true);
+        }
         $propertyWriteTarget = $this->preparePropertyWriteTarget($left->var, $offsetWriteOnObject);
         $code     = '';
         $value    = $this->parseExprAsValue($right);
@@ -1762,7 +1769,7 @@ trait AssignOpTrait
             return '((' . $tmp . ' = ' . $value . ', ' . $array . '.newItem() = ' . $tmp . '), ' . $tmp . ')';
         }
         $dim = $arrayDefWrite?->key ?? $this->parseIdentifier($left->dim);
-        return '((' . $tmp . ' = ' . $value . ', ' . $array . '.item(' . $dim . ', true) = ' . $tmp . '), ' . $tmp . ')';
+        return '((' . $tmp . ' = ' . $value . ', ' . $array . '.offsetSet(' . $dim . ', ' . $tmp . ')), ' . $tmp . ')';
     }
 
     protected function parseAssignOpCoalesce(Expr\AssignOp\Coalesce $expr): string

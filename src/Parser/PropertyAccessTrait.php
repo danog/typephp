@@ -305,7 +305,8 @@ trait PropertyAccessTrait
     protected function emitDynamicPropertyFetchUpdateArray(Expr\PropertyFetch $expr, string $dim, string $value, ?PropertyWriteTarget $target = null): string
     {
         if ($this->isNativePropertyAccess($expr)) {
-            return $this->parseWritableIdentifier($expr) . ".item({$dim}, true) = {$value}";
+            // Variant::offsetSet() follows PHP: arrays are written in place, ArrayAccess objects get offsetSet()
+            return $this->parseWritableIdentifier($expr) . ".offsetSet({$dim}, {$value})";
         }
         if ($this->canEmitDynamicPropertyTarget($target)) {
             return $this->emitDynamicPropertyTargetUpdateArray(
@@ -356,14 +357,14 @@ trait PropertyAccessTrait
         if ($this->usesTraitPropertyScope($object)) {
             return 'typephp_read_property_scoped('
                 . $object . ', ' . $property . ', php::FakeScopeGuard::current(), php::AttrMode::Update)'
-                . ".item({$dim}, true) = {$value}";
+                . ".offsetSet({$dim}, {$value})";
         }
         if ($cache !== null) {
             return 'typephp_read_property_cached('
                 . $object . ', ' . $property . ', php::AttrMode::Update, ' . $cache . ')'
-                . ".item({$dim}, true) = {$value}";
+                . ".offsetSet({$dim}, {$value})";
         }
-        return "{$object}.attr({$property}, php::AttrMode::Update).item({$dim}, true) = {$value}";
+        return "{$object}.attr({$property}, php::AttrMode::Update).offsetSet({$dim}, {$value})";
     }
 
     protected function assertDynamicPropertyTarget(PropertyWriteTarget $target): void
@@ -705,6 +706,11 @@ trait PropertyAccessTrait
         if ($access === null || !$access->getPropertyDef()->isReadonly()) {
             return;
         }
+        if ($property->getAttribute('readonlyOffsetWrite', false)) {
+            // `$this->readonlyObject[$key] = $value` calls offsetSet() on the
+            // held object and does not rebind the property
+            return;
+        }
 
         $declaringClass = $access->resolution->declaringClass;
         $propertyName = $this->parseIdentifier($property->name);
@@ -793,7 +799,7 @@ trait PropertyAccessTrait
         }
 
         $rightType = $this->detectTypeOfExpr($right);
-        if ($this->isFixedObjectProp($def) && $rightType !== Type::VAR) {
+        if ($this->isFixedObjectProp($def) && $rightType !== Type::VAR && $rightType !== Type::REF) {
             if (!$this->canAssignStaticTypeToObjectProperty($def, $rightType)) {
                 $this->fatalError(
                     $left,
