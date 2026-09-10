@@ -189,7 +189,12 @@ trait CallArgumentGenerator
                     }
                 }
 
-                $variadicVar ??= $this->addTmpVar(Type::ARRAY);
+                if ($variadicVar === null) {
+                    // The temporary is declared once per function; a call in a
+                    // loop must start from an empty argument list each time.
+                    $variadicVar = $this->addTmpVar(Type::ARRAY);
+                    $this->context->beforeStmtLines[] = $variadicVar . ' = php::Array{};';
+                }
                 if ($arg->unpack) {
                     $method = $argInfo->byRef ? 'mergeReferences' : 'merge';
                     $this->context->beforeStmtLines[] = $variadicVar . '.' . $method
