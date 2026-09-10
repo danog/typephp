@@ -1196,7 +1196,13 @@ trait MethodCallTrait
             }
 
             if ($callScope) {
-                $nativeFunc = $this->getNativeMethod($expr, $class, $method);
+                try {
+                    $nativeFunc = $this->getNativeMethod($expr, $class, $method);
+                } catch (DynamicCall) {
+                    // e.g. a static method inherited from an internal class
+                    // (PhpToken::tokenize()); Zend resolves it at runtime
+                    $nativeFunc = false;
+                }
                 if ($nativeFunc) {
                     try {
                         if ($this->shouldUseDynamicCallForNativeArgs($nativeFunc, $expr->args)) {

@@ -114,7 +114,11 @@ trait SwitchTrait
                 and !$this->isContinueExpr($lastExpr)
                 and !$this->isThrowExpr($lastExpr)
             ) {
-                $this->fatalError($case, 'switch case must end with return/break/continue/exit/throw, ' . $lastExpr->getType() . ' given');
+                // PHP falls through into the following cases; this lowering has
+                // no shared label to jump to, so the statements of the cases
+                // that would run next are appended (until one of them ends
+                // with a terminating statement).
+                $stmts = $this->appendFallthroughCaseStmts($v->cases, $case, $stmts);
             }
             $target = count($caseGroups);
             if ($hasDefault) {
@@ -185,4 +189,40 @@ trait SwitchTrait
         return $var_def . $code;
     }
 
+
+    /**
+     * @param list<Node\Stmt\Case_> $cases
+     * @param list<Node\Stmt> $stmts
+     * @return list<Node\Stmt>
+     */
+    private function appendFallthroughCaseStmts(array $cases, Node\Stmt\Case_ $case, array $stmts): array
+    {
+        $found = false;
+        foreach ($cases as $next) {
+            if (!$found) {
+                $found = $next === $case;
+                continue;
+            }
+            $nextStmts = $next->stmts;
+            if (count($nextStmts) === 1 and $nextStmts[0] instanceof Node\Stmt\Block) {
+                $nextStmts = $nextStmts[0]->stmts;
+            }
+            if (empty($nextStmts)) {
+                continue;
+            }
+            $stmts = array_merge($stmts, $nextStmts);
+            $lastExpr = end($nextStmts);
+            if ($this->isReturnExpr($lastExpr)
+                or $this->isExitExpr($lastExpr)
+                or $this->isBreakExpr($lastExpr)
+                or $this->isContinueExpr($lastExpr)
+                or $this->isThrowExpr($lastExpr)
+            ) {
+                return $stmts;
+            }
+        }
+        // the last case of the switch: execution leaves the switch
+        $stmts[] = new Node\Stmt\Break_();
+        return $stmts;
+    }
 }

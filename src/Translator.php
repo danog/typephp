@@ -3382,7 +3382,7 @@ CODE;
     {
         $this->climate->info('convert: ' . $this->getRelativePath($this->file));
 
-        $ast = $this->parser->parse($phpCode);
+        $ast = $this->resolveFileMagicConstants($this->parser->parse($phpCode), $this->file);
         $traverser = new NodeTraverser();
         $traverser->addVisitor(new NameResolver(null, ['replaceNodes' => false]));
         if ($this->isNanoPolicyMode()) {
@@ -5293,6 +5293,31 @@ CODE;
      * @throws \Exception
      */
     protected function parseFunction(Node\Stmt\Function_|Node\Stmt\ClassMethod $v): string
+    {
+        $indentLevel = $this->indentLevel;
+        $inGeneratorBody = $this->inGeneratorBody;
+        $previousKey = $this->retryFunctionKey;
+        $this->retryFunctionKey = spl_object_id($v);
+        try {
+            while (true) {
+                try {
+                    return $this->parseFunctionAttempt($v);
+                } catch (\TypePhp\Exception\LocalTypeConflict $e) {
+                    $this->retryDegradations[$this->retryFunctionKey][$e->variable] = true;
+                    $this->climate->cyan(
+                        'Local `$' . $e->variable . '` uses dynamic storage: ' . $e->getMessage()
+                            . ' in ' . $this->getRelativePath($this->file) . ':' . $e->node->getStartLine(),
+                    );
+                    $this->indentLevel = $indentLevel;
+                    $this->inGeneratorBody = $inGeneratorBody;
+                }
+            }
+        } finally {
+            $this->retryFunctionKey = $previousKey;
+        }
+    }
+
+    protected function parseFunctionAttempt(Node\Stmt\Function_|Node\Stmt\ClassMethod $v): string
     {
         $this->resetFunction();
         $name = $this->getFunctionName($v);

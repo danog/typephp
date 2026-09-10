@@ -395,7 +395,7 @@ class Preprocessor extends CompilerBase
 
             $this->climate->info('prepare: ' . $this->getRelativePath($this->file));
             try {
-                $ast = $this->parser->parse($phpCode);
+                $ast = $this->resolveFileMagicConstants($this->parser->parse($phpCode), $this->file);
             } catch (\PhpParser\Error $e) {
                 $this->climate->red("Fatal error: {$e->getMessage()} in {$this->file}");
                 throw new SyntaxError($e->getMessage(), $e->getCode());
@@ -487,6 +487,38 @@ class Preprocessor extends CompilerBase
      *
      * @param list<string> $files
      */
+    /**
+     * Replaces __DIR__ and __FILE__ with the compiled file's location so that
+     * they can also appear in constant expressions (class constants, property
+     * and parameter defaults), which are evaluated before code generation.
+     *
+     * @param array<Node>|null $ast
+     * @return array<Node>
+     */
+    public function resolveFileMagicConstants(?array $ast, string $file): array
+    {
+        $ast ??= [];
+        $realFile = realpath($file) ?: $file;
+        $traverser = new NodeTraverser();
+        $traverser->addVisitor(new class ($realFile) extends \PhpParser\NodeVisitorAbstract {
+            public function __construct(private readonly string $file)
+            {
+            }
+
+            public function leaveNode(Node $node): ?Node
+            {
+                if ($node instanceof Node\Scalar\MagicConst\Dir) {
+                    return new Node\Scalar\String_(dirname($this->file), $node->getAttributes());
+                }
+                if ($node instanceof Node\Scalar\MagicConst\File) {
+                    return new Node\Scalar\String_($this->file, $node->getAttributes());
+                }
+                return null;
+            }
+        });
+        return $traverser->traverse($ast);
+    }
+
     public function composeTraitDeclarations(array $files): void
     {
         if ($this->traitDeclarationsComposed) {

@@ -594,12 +594,12 @@ trait AssignOpTrait
                         // A child object can be assigned to a parent typed object.
                     } elseif ($this->isInterface($rightClass) || $this->isAbstractClass($rightClass) || $this->isObjectClassStaticallyAssignableTo($leftClass, $rightClass)) {
                         if ($this->isKnownConcreteObjectExpr($right, $rightClass)) {
-                            $this->fatalError($left, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
+                            $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
                         }
                         // Parent/interface/abstract declarations are not precise enough for a concrete typed object.
                         $runtimeObjectAssignClass = $leftClass;
                     } else {
-                        $this->fatalError($left, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
+                        $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
                     }
                 } else {
                     $this->checkVarAssignExpr($left, $this->getVarType($var), Type::OBJECT);
@@ -690,7 +690,7 @@ trait AssignOpTrait
                         } elseif ($this->isInterface($rightClass) || $this->isAbstractClass($rightClass) || $this->isObjectClassStaticallyAssignableTo($leftClass, $rightClass)) {
                             $runtimeObjectAssignClass = $leftClass;
                         } else {
-                            $this->fatalError($left, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
+                            $this->localTypeConflict($left, $var, "Cannot re-assign typed object `\${$var}` from `{$leftClass}` to `{$rightClass}`");
                         }
                     }
                 }
@@ -1614,12 +1614,18 @@ trait AssignOpTrait
         // read later breaks append and missing-key targets such as
         // `$array[] =& $source`.
 
+        $rebindDegradedVar = false;
         if ($this->isVarExpr($expr->var)) {
             if (!$this->hasVar($left)) {
                 $this->addLocalVar($left, Type::REF);
             } else {
                 $type = $this->getVarType($left);
-                if ($type !== Type::REF) {
+                if ($type === Type::VAR && isset($this->context->varTypeDegradations[$left])) {
+                    // A local captured by reference by a Closure owns a php::Var
+                    // slot; `$var = &$source` turns that slot into the Zend
+                    // reference so the Closure shares the source storage.
+                    $rebindDegradedVar = true;
+                } elseif ($type !== Type::REF) {
                     $this->fatalError($expr, 'Cannot assign reference to variable of type ' . $type);
                 }
             }
@@ -1708,13 +1714,20 @@ trait AssignOpTrait
             return 'typephp_rebind_property_reference('
                 . $object . ', ' . $member . ', ' . $tmpVar . ', ' . $scope . ')';
         }
+        if ($rebindDegradedVar) {
+            return $left . '.rebindReference(' . $tmpVar . ')';
+        }
         return $left . ' = &' . $tmpVar;
     }
 
     protected function parseAssignPropertyArrayDim(NodeAbstract $left, NodeAbstract $right): string
     {
         $this->assertNativePropertyHookDirectWriteTarget($left);
-        $propertyWriteTarget = $this->preparePropertyWriteTarget($left->var);
+        // `$this->readonlyObject[$key] = $value` does not rebind the property:
+        // it is an offsetSet() call on the (ArrayAccess) object it holds.
+        $propertyDef = $left->var instanceof Expr\PropertyFetch ? $this->getNativePropertyDef($left->var) : null;
+        $offsetWriteOnObject = $propertyDef !== null && $propertyDef->type === Type::OBJECT;
+        $propertyWriteTarget = $this->preparePropertyWriteTarget($left->var, $offsetWriteOnObject);
         $code     = '';
         $value    = $this->parseExprAsValue($right);
         $arrayDefWrite = $this->prepareArrayDefDirectWrite($left, $right, $value);

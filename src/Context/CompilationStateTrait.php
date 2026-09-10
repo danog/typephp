@@ -37,6 +37,17 @@ trait CompilationStateTrait
     ): void
     {
         $analysis = (new ReferenceCaptureAnalyzer())->analyze($body);
+        if ($this->retryFunctionKey !== null) {
+            foreach ($this->retryDegradations[$this->retryFunctionKey] ?? [] as $name => $_) {
+                if (isset($this->context->arguments[$name])) {
+                    continue;
+                }
+                $this->context->varTypeDegradations[$name] = Type::VAR;
+                if (!$this->hasVar($name)) {
+                    $this->context->localVars[$name] = Type::VAR;
+                }
+            }
+        }
         foreach ($analysis['captures'] as $sourceName => $_) {
             $name = $this->escapeVarName($sourceName);
             if (isset($this->context->arguments[$name])) {

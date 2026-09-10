@@ -5199,10 +5199,36 @@ class CompilerBase implements PropertyAccessContext
         if (!$this->hasVar($name)) {
             $this->addLocalVar($name, $defaultType);
         } else {
-            if ($this->getVarType($name) !== $defaultType) {
-                $this->fatalError($node, 'Cannot assign value to variable $' . $name . ' of type ' . $this->getVarType($name) . ' with type ' . $defaultType);
+            $existingType = $this->getVarType($name);
+            if ($existingType !== $defaultType && $existingType !== Type::VAR) {
+                $this->localTypeConflict($node, $name, 'Cannot assign value to variable $' . $name . ' of type ' . $existingType . ' with type ' . $defaultType);
             }
         }
+    }
+
+    /**
+     * Per top-level function: locals that must use dynamic storage because a
+     * previous code generation attempt found conflicting static types.
+     *
+     * @var array<int, array<string, true>>
+     */
+    protected array $retryDegradations = [];
+
+    protected ?int $retryFunctionKey = null;
+
+    /**
+     * Reports incompatible static types for a local. Inside a function body the
+     * generation is retried with the local degraded to php::Var; elsewhere (or
+     * when the local is already dynamic) this is a fatal error.
+     */
+    protected function localTypeConflict(NodeAbstract $node, string $name, string $msg): never
+    {
+        if ($this->retryFunctionKey !== null
+            && !isset($this->retryDegradations[$this->retryFunctionKey][$name])
+        ) {
+            throw new \TypePhp\Exception\LocalTypeConflict($node, $name, $msg);
+        }
+        $this->fatalError($node, $msg);
     }
 
     protected function checkVarMustExist(NodeAbstract $node, string $name): void
@@ -5240,6 +5266,7 @@ class CompilerBase implements PropertyAccessContext
         $varName = 'variable';
         if ($this->isVarExpr($left)) {
             $varName = '`$' . $this->parseIdentifier($left) . '`';
+            $this->localTypeConflict($left, $this->parseIdentifier($left), "Cannot re-assign $varName from `{$fromType}` to `{$toType}`");
         }
         $this->fatalError($left, "Cannot re-assign $varName from `{$fromType}` to `{$toType}`");
     }

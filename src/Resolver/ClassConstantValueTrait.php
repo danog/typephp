@@ -144,6 +144,12 @@ trait ClassConstantValueTrait
             if ($expr instanceof Node\Expr\ClassConstFetch && $expr->class instanceof Node\Name) {
                 $constName = $expr->name->toString();
                 $className = $expr->class->toString();
+                $resolvedName = $expr->class->getAttribute('resolvedName');
+                if ($resolvedName instanceof Node\Name) {
+                    // honour the file's `use` imports: the expression may be
+                    // evaluated from another file/namespace
+                    $className = '\\' . ltrim($resolvedName->toString(), '\\');
+                }
                 if (strcasecmp($constName, 'class') === 0) {
                     // `::class` is a compile-time magic constant that resolves to the
                     // fully qualified class name of the referenced class.
