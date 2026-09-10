@@ -1931,7 +1931,9 @@ class FuncInfo {
                 $flags[] = "ZEND_ACC_FINAL";
             }
 
-            if ($this->flags & Modifiers::ABSTRACT) {
+            // Zend warns about abstract static methods of internal classes
+            // ("cannot be abstract"); interface methods are abstract anyway.
+            if (($this->flags & Modifiers::ABSTRACT) && !($this->flags & Modifiers::STATIC)) {
                 $flags[] = "ZEND_ACC_ABSTRACT";
             }
         }
