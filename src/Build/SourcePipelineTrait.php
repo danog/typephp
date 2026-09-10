@@ -361,6 +361,16 @@ trait SourcePipelineTrait
                     echo ' unsupported syntax: ' . $e->getMessage() . "\n";
                     echo ' skip: ' . $file . "\n";
                     unset($files[$k]);
+                } catch (\Throwable $e) {
+                    $collect = getenv('TYPEPHP_COLLECT_ERRORS');
+                    if (!is_string($collect) || $collect === '') {
+                        throw $e;
+                    }
+                    // In collect mode an internal error (typically a cascade
+                    // from an earlier skipped file) must not abort the run.
+                    file_put_contents($collect, 'INTERNAL: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ') in ' . $file . "\n", FILE_APPEND);
+                    echo ' internal error: ' . $e->getMessage() . "\n skip: " . $file . "\n";
+                    unset($files[$k]);
                 }
             }
 

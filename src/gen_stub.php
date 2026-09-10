@@ -72,6 +72,17 @@ function getClassConstFetchClassName(Expr\ClassConstFetch $expr): string
     if ($expr->class instanceof PhpParser\Node\Name\FullyQualified) {
         return '\\' . $className;
     }
+    // Honour `use` imports resolved by the NameResolver (preserveOriginalNames
+    // keeps the short name on the node), so that constants of imported classes
+    // used in parameter or property defaults resolve to the right class.
+    $resolved = $expr->class->getAttribute('resolvedName');
+    if ($resolved instanceof PhpParser\Node\Name
+        && strcasecmp($className, 'self') !== 0
+        && strcasecmp($className, 'static') !== 0
+        && strcasecmp($className, 'parent') !== 0
+    ) {
+        return '\\' . $resolved->toString();
+    }
     return $className;
 }
 
