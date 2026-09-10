@@ -100,7 +100,17 @@ trait NullsafeAccessTrait
             }
             if ($item[0] == 'property') {
                 $update = $this->escapeAttrMode($this->isPropertyFetchUpdate($item[2]));
-                $code .= $this->getIndent() . "{$tmpVar} = {$object}.attr({$item[1]}, {$update});" . PHP_EOL;
+                if ($object === 'this_' && $this->class) {
+                    // `$this->prop?->...`: read with the declaring class scope so
+                    // that private/protected properties are visible when $this
+                    // is a subclass instance
+                    $scope = $this->classDef?->trait
+                        ? 'php::FakeScopeGuard::current()'
+                        : $this->getLocalClassEntryPtr($this->getFullClassName());
+                    $code .= $this->getIndent() . "{$tmpVar} = typephp_read_property_scoped({$object}, {$item[1]}, {$scope}, {$update});" . PHP_EOL;
+                } else {
+                    $code .= $this->getIndent() . "{$tmpVar} = {$object}.attr({$item[1]}, {$update});" . PHP_EOL;
+                }
             } else {
                 $methodName = $this->isNamedMethod($item[4]->name)
                     ? $this->parseIdentifier($item[4]->name)

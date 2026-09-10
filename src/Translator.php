@@ -1340,6 +1340,7 @@ CODE;
             && !$this->isIosTarget()) {
             $code .= $this->getIndent() . "PHP_FE(cli_set_process_title,        arginfo_cli_set_process_title)\n";
             $code .= $this->getIndent() . "PHP_FE(cli_get_process_title,        arginfo_cli_get_process_title)\n";
+            $code .= $this->getIndent() . "PHP_FE(typephp_set_server_argv,      arginfo_typephp_set_server_argv)\n";
         }
 
         foreach ($this->symbols->functions() as $functionDef) {
