@@ -203,22 +203,39 @@ trait FunctionCallTrait
                 return 'typephp_call_cached(' . $fn . ', ' . $this->getFunctionCallCache() . ')';
             }
             $scopeArg = $runtimeCallScope === null ? '' : $runtimeCallScope . ', ';
-            return 'php::call(' . $scopeArg . $fn . ')';
+            return $this->wrapRuntimeCallResult($name, 'php::call(' . $scopeArg . $fn . ')');
         }
         try {
             if ($name === '' && $runtimeCallScope === null) {
                 return 'typephp_call_cached(' . $fn . ', ' . $this->getFunctionCallCache() . ', '
                     . $this->parseCallArgs($expr->args) . ')';
             }
-            return $this->genRuntimeFunctionCall(
+            return $this->wrapRuntimeCallResult($name, $this->genRuntimeFunctionCall(
                 $fn,
                 $expr->args,
                 $name,
                 scope: $runtimeCallScope ?? '',
-            );
+            ));
         } catch (PlaceHolder) {
             return $this->genPlaceHolder($placeHolder);
         }
+    }
+
+    /**
+     * A runtime call returns a Variant; the expression is typed after the
+     * function's declared return type, so a scalar result is converted to
+     * the native type the rest of the code generation expects.
+     */
+    protected function wrapRuntimeCallResult(string $name, string $code): string
+    {
+        if ($name === '') {
+            return $code;
+        }
+        $type = $this->detectFuncCallReturnType($name);
+        if (in_array($type, [Type::INT, Type::FLOAT, Type::STR, Type::BOOL], true)) {
+            return $this->convertExprFromType($type, $code);
+        }
+        return $code;
     }
 
     /**

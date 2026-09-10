@@ -996,7 +996,7 @@ class Translator extends Preprocessor
         foreach ($this->getClassLikesWithConstants() as $classDef) {
             foreach ($classDef->constants as $constant) {
                 if ($constant->type === Type::ARRAY) {
-                    $constName = self::PREFIX . $this->getNativeName($constant->name, $classDef->namespace, $classDef->name);
+                    $constName = self::PREFIX . $this->getNativeConstName($constant->name, $classDef->namespace, $classDef->name);
                     $lines[] = 'extern ' . Type::VAR . ' ' . $constName . ';' . PHP_EOL;
                 }
             }
@@ -1322,7 +1322,7 @@ CODE;
             }
             foreach ($classDef->constants as $constant) {
                 if ($constant->type === Type::ARRAY) {
-                    $constName = self::PREFIX . $this->getNativeName($constant->name, $classDef->namespace, $classDef->name);
+                    $constName = self::PREFIX . $this->getNativeConstName($constant->name, $classDef->namespace, $classDef->name);
                     $code .= Type::VAR . ' ' . $constName . ";\n";
                 }
             }
@@ -1544,7 +1544,7 @@ CODE;
         foreach ($this->getClassLikesWithConstants() as $classDef) {
             foreach ($classDef->constants as $constant) {
                 if ($constant->type === Type::ARRAY) {
-                    $constName = self::PREFIX . $this->getNativeName($constant->name, $classDef->namespace, $classDef->name);
+                    $constName = self::PREFIX . $this->getNativeConstName($constant->name, $classDef->namespace, $classDef->name);
                     $code .= $constName . ".unset();\n";
 
                     if (!$classDef instanceof ClassDef || !$classDef->nativeObject) {
@@ -2960,7 +2960,7 @@ CODE;
         foreach ($this->getClassLikesWithConstants() as $classDef) {
             foreach ($classDef->constants as $constant) {
                 if ($constant->type === Type::ARRAY) {
-                    $constName = self::PREFIX . $this->getNativeName($constant->name, $classDef->namespace, $classDef->name);
+                    $constName = self::PREFIX . $this->getNativeConstName($constant->name, $classDef->namespace, $classDef->name);
                     $code .= "do {\n";
                     $code .= $constant->arrayExpr;
                     $code .= $constName . ' = ' . $constant->value . ";\n";
@@ -2992,7 +2992,7 @@ CODE;
                 foreach ($parentDef->constants as $constant) {
                     if ($constant->type === Type::ARRAY && !isset($ownConstNames[$constant->name])) {
                         $ownConstNames[$constant->name] = true;
-                        $constName = self::PREFIX . $this->getNativeName($constant->name, $parentDef->namespace, $parentDef->name);
+                        $constName = self::PREFIX . $this->getNativeConstName($constant->name, $parentDef->namespace, $parentDef->name);
                         $classNameStr = $this->genCharPtr($classDef->getNamespacedName(false), true);
                         $classConstStr = $this->genCharPtr($constant->name);
                         $code .= "php::updateConstant($classNameStr, $classConstStr, {$constName});\n";
@@ -3009,7 +3009,7 @@ CODE;
                 foreach ($interfaceDef->constants as $constant) {
                     if ($constant->type === Type::ARRAY && !isset($ownConstNames[$constant->name])) {
                         $ownConstNames[$constant->name] = true;
-                        $constName = self::PREFIX . $this->getNativeName($constant->name, $interfaceDef->namespace, $interfaceDef->name);
+                        $constName = self::PREFIX . $this->getNativeConstName($constant->name, $interfaceDef->namespace, $interfaceDef->name);
                         $classNameStr = $this->genCharPtr($classDef->getNamespacedName(false), true);
                         $classConstStr = $this->genCharPtr($constant->name);
                         $code .= "php::updateConstant($classNameStr, $classConstStr, {$constName});\n";
@@ -5298,10 +5298,13 @@ CODE;
         $inGeneratorBody = $this->inGeneratorBody;
         $previousKey = $this->retryFunctionKey;
         $this->retryFunctionKey = spl_object_id($v);
+        // lowering passes annotate and rewrite nodes; every attempt starts
+        // from an untouched copy
+        $pristine = $this->deepCloneNode($v);
         try {
             while (true) {
                 try {
-                    return $this->parseFunctionAttempt($v);
+                    return $this->parseFunctionAttempt($this->deepCloneNode($pristine));
                 } catch (\TypePhp\Exception\LocalTypeConflict $e) {
                     $this->retryDegradations[$this->retryFunctionKey][$e->variable] = true;
                     $this->climate->cyan(
@@ -5315,6 +5318,33 @@ CODE;
         } finally {
             $this->retryFunctionKey = $previousKey;
         }
+    }
+
+    /**
+     * @template T of Node
+     * @param T $node
+     * @return T
+     */
+    protected function deepCloneNode(Node $node): Node
+    {
+        $copy = clone $node;
+        foreach ($copy->getSubNodeNames() as $field) {
+            $copy->{$field} = $this->deepCloneValue($copy->{$field});
+        }
+        return $copy;
+    }
+
+    private function deepCloneValue(mixed $value): mixed
+    {
+        if ($value instanceof Node) {
+            return $this->deepCloneNode($value);
+        }
+        if (is_array($value)) {
+            foreach ($value as $k => $item) {
+                $value[$k] = $this->deepCloneValue($item);
+            }
+        }
+        return $value;
     }
 
     protected function parseFunctionAttempt(Node\Stmt\Function_|Node\Stmt\ClassMethod $v): string

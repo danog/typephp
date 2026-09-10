@@ -120,6 +120,18 @@ trait BinaryOpTrait
             $this->fatalError($left, "Operator '{$op}' is not supported for Big* numeric types");
         }
 
+        // Bitwise operators convert float operands to int (PHP semantics).
+        if (in_array($op, ['<<', '>>', '&', '|', '^'], true)) {
+            if ($leftType === Type::FLOAT) {
+                $leftExpr = 'php::toInt(' . $leftExpr . ')';
+                $leftType = Type::INT;
+            }
+            if ($rightType === Type::FLOAT) {
+                $rightExpr = 'php::toInt(' . $rightExpr . ')';
+                $rightType = Type::INT;
+            }
+        }
+
         // Only promote between native types (Int ↔ Float).  When one side is
         // php::Var, let the Variant operator handle type coercion so that
         // run-time PHP type-juggling rules are followed correctly.
@@ -144,7 +156,8 @@ trait BinaryOpTrait
 
         if ($op === '%') {
             if (!($leftType === Type::INT and $rightType === Type::INT)) {
-                return 'php::fn::mod(' . $leftExpr . ', ' . $rightExpr . ')';
+                // the result of % is always int (or a DivisionByZeroError)
+                return 'php::toInt(php::fn::mod(' . $leftExpr . ', ' . $rightExpr . '))';
             }
             // varint_types retains PHP's catchable modulo errors and
             // PHP_INT_MIN % -1 behavior. Native integers use raw C++ rules.

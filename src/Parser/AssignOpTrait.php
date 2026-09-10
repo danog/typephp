@@ -1715,8 +1715,9 @@ trait AssignOpTrait
         $this->context->beforeStmtLines[] = $rightExpr . ';';
         if ($propertyReferenceTarget !== null) {
             [$object, $member, $scope] = $propertyReferenceTarget;
-            return 'typephp_rebind_property_reference('
-                . $object . ', ' . $member . ', ' . $tmpVar . ', ' . $scope . ')';
+            // the expression value is the bound reference (`$a = $this->p = &$x`)
+            return '(typephp_rebind_property_reference('
+                . $object . ', ' . $member . ', ' . $tmpVar . ', ' . $scope . '), ' . $tmpVar . ')';
         }
         if ($rebindDegradedVar) {
             return $left . '.rebindReference(' . $tmpVar . ')';

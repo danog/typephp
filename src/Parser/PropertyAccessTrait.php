@@ -1276,6 +1276,14 @@ trait PropertyAccessTrait
         }
         if ($def) {
             $this->setNativePropertyValueSource($expr, self::NATIVE_PROPERTY_VALUE_DYNAMIC);
+            if (!$update
+                && !$def->nullable
+                && in_array($def->type, [Type::INT, Type::FLOAT, Type::STR, Type::BOOL], true)
+            ) {
+                // the expression is typed after the declaration, so the C++
+                // value must be the native type as well
+                return $this->convertExprFromType($def->type, $getProperty);
+            }
         }
         return $getProperty;
     }

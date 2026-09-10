@@ -38,7 +38,14 @@ trait ForeachTrait
                 if ($this->isVarExpr($item->value) and !$this->hasVar($var)) {
                     $this->addLocalVar($var, Type::VAR);
                 }
-                $code .= $this->getIndent() . $var . ' = ' . $listTmpVar . '.item(' . $key . ');' . PHP_EOL;
+                $itemExpr = $listTmpVar . '.item(' . $key . ')';
+                if ($this->isVarExpr($item->value)) {
+                    $varType = $this->getVarType($var);
+                    if (in_array($varType, [Type::INT, Type::FLOAT, Type::STR, Type::BOOL], true)) {
+                        $itemExpr = $this->convertExprFromType($varType, $itemExpr);
+                    }
+                }
+                $code .= $this->getIndent() . $var . ' = ' . $itemExpr . ';' . PHP_EOL;
             } else {
                 $this->fatalError($item, 'Unsupported foreach item type');
             }

@@ -1410,6 +1410,16 @@ class CompilerBase implements PropertyAccessContext
     }
 
     /**
+     * The C++ symbol of a class constant. Constant names are case-sensitive
+     * and must not collide with the lowercased method symbols
+     * (`QueueState::CONTINUE` vs `QueueState::continue()`).
+     */
+    protected function getNativeConstName(string $const, string $ns, string $class): string
+    {
+        return $this->getNativeName('', $ns, $class) . self::NAMESPACE_SEPARATOR . 'c_' . $const;
+    }
+
+    /**
      * The C++ symbol of a fully qualified (namespaced) function name.
      */
     protected function getFunctionSymbol(string $fqName): string
@@ -3109,7 +3119,7 @@ class CompilerBase implements PropertyAccessContext
                 }
                 $interfaceConstDef = $interfaceDef->constants[$const];
                 if ($interfaceConstDef->type === Type::ARRAY) {
-                    return self::PREFIX . $this->getNativeName($interfaceConstDef->name, $interfaceDef->namespace, $interfaceDef->name);
+                    return self::PREFIX . $this->getNativeConstName($interfaceConstDef->name, $interfaceDef->namespace, $interfaceDef->name);
                 }
                 if (!$interfaceConstDef->codegenFinalized) {
                     return false;
@@ -3130,7 +3140,7 @@ class CompilerBase implements PropertyAccessContext
             $this->fatalError($expr, 'Constant `' . $classDef->getNamespacedName() . '::' . $const . '` is not accessible');
         }
         if ($constDef->type === Type::ARRAY) {
-            return self::PREFIX . $this->getNativeName($constDef->name, $classDef->namespace, $classDef->name);
+            return self::PREFIX . $this->getNativeConstName($constDef->name, $classDef->namespace, $classDef->name);
         } else {
             // Forward constant references may be encountered while the
             // declaration-expression pass is still visiting another file.
@@ -3306,6 +3316,16 @@ class CompilerBase implements PropertyAccessContext
                         return Type::BIGINT;
                     }
                     return Type::BIGINT;
+                }
+                if (in_array($exprType, [
+                    'Expr_BinaryOp_ShiftLeft',
+                    'Expr_BinaryOp_ShiftRight',
+                    'Expr_BinaryOp_BitwiseAnd',
+                    'Expr_BinaryOp_BitwiseOr',
+                    'Expr_BinaryOp_BitwiseXor',
+                ], true)) {
+                    // bitwise operators convert their operands to int
+                    return Type::INT;
                 }
                 if ($leftType === Type::FLOAT || $rightType === Type::FLOAT) {
                     return Type::FLOAT;
