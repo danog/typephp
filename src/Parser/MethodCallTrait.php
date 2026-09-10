@@ -643,6 +643,7 @@ trait MethodCallTrait
             if ($keywordType !== null
                 && isset(self::KEYWORD_METHOD_MAP[$methodName])
                 && !$expr->getAttribute('nativeKeywordCall', false)
+                && !$this->userClassDeclaresMethod($class, $methodName)
             ) {
                 if ($this->isVarExpr($expr->var)) {
                     $this->assertStdContainerDoesNotEscapeNativeObjects($expr, $object);
@@ -1265,4 +1266,22 @@ trait MethodCallTrait
         }
     }
 
+
+    /**
+     * A user class method named like a conversion keyword (toDecimal(),
+     * toArray(), ...) is an ordinary method call on that class.
+     */
+    protected function userClassDeclaresMethod(string $class, string $method): bool
+    {
+        if ($class === '') {
+            return false;
+        }
+        if ($this->hasClass($class)) {
+            return $this->getClass($class)->hasMethod($method);
+        }
+        if ($this->hasInterface($class)) {
+            return $this->getInterface($class)->hasMethod($method);
+        }
+        return false;
+    }
 }

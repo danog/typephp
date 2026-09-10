@@ -46,6 +46,27 @@ trait DeclarationSymbolTrait
         return isset($this->constants[$this->escapeConstVar($name)]);
     }
 
+    /**
+     * A stand-in value of a user constant's type for the stub generator, which
+     * only needs the type of a default value (the compiler emits the value).
+     *
+     * @return array{mixed}|null null when the constant is unknown
+     */
+    public function userConstantPlaceholder(string $name): ?array
+    {
+        $name = ltrim($name, '\\');
+        if (!$this->hasConstant($name)) {
+            return null;
+        }
+        return [match ($this->constants[$this->escapeConstVar($name)]->type) {
+            Type::INT => 1,
+            Type::FLOAT => M_PI,
+            Type::BOOL => true,
+            Type::ARRAY => [],
+            default => $name,
+        }];
+    }
+
     protected function getConstant(string $name): string
     {
         return $this->escapeConstVar($name);

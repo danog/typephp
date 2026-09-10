@@ -2399,7 +2399,12 @@ class CompilerBase implements PropertyAccessContext
                     return $classDef->getMethod($method)->functionDef->returnClass;
                 }
             }
-            $nativeFunc = $this->getNativeMethod($expr, $class, $method);
+            try {
+                $nativeFunc = $this->getNativeMethod($expr, $class, $method);
+            } catch (DynamicCall) {
+                // inherited from an internal class: resolved at runtime
+                $nativeFunc = false;
+            }
             if ($nativeFunc) {
                 return $this->getFunction($nativeFunc)->returnClass;
             }

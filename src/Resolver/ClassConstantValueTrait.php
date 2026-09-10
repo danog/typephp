@@ -145,7 +145,9 @@ trait ClassConstantValueTrait
                 $constName = $expr->name->toString();
                 $className = $expr->class->toString();
                 $resolvedName = $expr->class->getAttribute('resolvedName');
-                if ($resolvedName instanceof Node\Name) {
+                if ($resolvedName instanceof Node\Name
+                    && !in_array(strtolower($className), ['self', 'static', 'parent'], true)
+                ) {
                     // honour the file's `use` imports: the expression may be
                     // evaluated from another file/namespace
                     $className = '\\' . ltrim($resolvedName->toString(), '\\');

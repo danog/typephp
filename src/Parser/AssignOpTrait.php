@@ -1725,8 +1725,10 @@ trait AssignOpTrait
         $this->assertNativePropertyHookDirectWriteTarget($left);
         // `$this->readonlyObject[$key] = $value` does not rebind the property:
         // it is an offsetSet() call on the (ArrayAccess) object it holds.
-        $propertyDef = $left->var instanceof Expr\PropertyFetch ? $this->getNativePropertyDef($left->var) : null;
-        $offsetWriteOnObject = $propertyDef !== null && $propertyDef->type === Type::OBJECT;
+        $propertyDef = $left->var instanceof Expr\PropertyFetch
+            ? $this->getNativePropertyAccess($left->var)?->getPropertyDef()
+            : null;
+        $offsetWriteOnObject = $propertyDef !== null && ($propertyDef->type === Type::OBJECT || $propertyDef->class !== '');
         $propertyWriteTarget = $this->preparePropertyWriteTarget($left->var, $offsetWriteOnObject);
         $code     = '';
         $value    = $this->parseExprAsValue($right);

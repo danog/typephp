@@ -40,6 +40,24 @@ trait CompilationStateTrait
         if ($this->retryFunctionKey !== null) {
             foreach ($this->retryDegradations[$this->retryFunctionKey] ?? [] as $name => $_) {
                 if (isset($this->context->arguments[$name])) {
+                    $type = $this->getRawVarType($name);
+                    if (!$degradeArguments
+                        || $type === Type::VAR
+                        || $type === Type::REF
+                        || Type::isTypedRefType($type)
+                        || $this->isNativeObjectVar($name)
+                    ) {
+                        continue;
+                    }
+                    $this->context->varTypeDegradations[$name] = Type::VAR;
+                    $this->context->localVars[$name] = Type::VAR;
+                    unset(
+                        $this->context->objects[$name],
+                        $this->context->declaredObjects[$name],
+                        $this->context->stableObjects[$name],
+                        $this->context->exactObjects[$name],
+                        $this->context->nonNullNativeObjects[$name],
+                    );
                     continue;
                 }
                 $this->context->varTypeDegradations[$name] = Type::VAR;

@@ -2748,6 +2748,21 @@ class EvaluatedValue
                     }
                 }
 
+                // constants declared by the compiled sources (possibly in another file)
+                $candidates = [$constName];
+                foreach (['resolvedName', 'namespacedName'] as $attribute) {
+                    $resolved = $expr->name->getAttribute($attribute);
+                    if ($resolved instanceof Node\Name) {
+                        array_unshift($candidates, $resolved->toString());
+                    }
+                }
+                foreach ($candidates as $candidate) {
+                    $placeholder = getTranslator()->userConstantPlaceholder($candidate);
+                    if ($placeholder !== null) {
+                        return $placeholder[0];
+                    }
+                }
+
                 throw new Exception("Constant " . $constName . " cannot be found");
             }
         );
@@ -5057,7 +5072,7 @@ class FileInfo {
             }
         };
 
-        $stmts = $parser->parse($code);
+        $stmts = getTranslator()->resolveFileMagicConstants($parser->parse($code), $sourceFile);
         $stmts = $nodeTraverser->traverse($stmts);
 
         $fileTags = DocCommentTag::parseDocComments(self::getFileDocComments($stmts));
