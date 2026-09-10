@@ -24,7 +24,11 @@ trait PropertyPromotion
             return 'this_.' . $this->getNativeObjectPropertyCppName($property, $this->classDef)
                 . ' = ' . $value . ';' . PHP_EOL;
         }
-        $code .= 'this_.setProperty(' . $this->genCharPtr($propertyName) . ', ' . $argInfo->name . ')';
+        // Write through the declaring class scope so that private promoted
+        // properties of a parent class are found when `$this` is a subclass.
+        $code .= $this->withoutLocalClassEntryHoisting(
+            fn () => $this->emitDynamicPropertyWrite('this_', $this->genCharPtr($propertyName), $argInfo->name),
+        );
         $code .= ";\n";
         return $code;
     }

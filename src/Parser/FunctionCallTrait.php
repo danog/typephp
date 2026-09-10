@@ -164,7 +164,10 @@ trait FunctionCallTrait
                 }
                 // Function call placeholder, not a real function call
                 if (count($expr->args) === 1 and $this->isPlaceholderExpr($expr->args[0])) {
-                    return $this->genPlaceHolder($this->identifierToStr($expr->name));
+                    // A compiled function is registered under its namespaced name.
+                    return $this->genPlaceHolder(
+                        $this->genCharPtr($this->getFunction($nativeFn)->getNamespacedName(), true),
+                    );
                 }
                 $this->checkNativeCallArgs($expr, $this->getFunction($nativeFn), $expr->args, $name);
                 if ($this->shouldUseDynamicCallForNativeArgs($nativeFn, $expr->args)) {
@@ -177,7 +180,9 @@ trait FunctionCallTrait
                         : self::PREFIX . $nativeFn;
                     return $callee . '(' . $this->parseNativeCallArgs($expr->args, $nativeFn) . ')';
                 } catch (PlaceHolder) {
-                    return $this->genPlaceHolder($this->identifierToStr($expr->name));
+                    return $this->genPlaceHolder(
+                        $this->genCharPtr($this->getFunction($nativeFn)->getNamespacedName(), true),
+                    );
                 }
             }
             // For dynamically dispatched functions, convert the function name to its fully qualified name including the namespace
