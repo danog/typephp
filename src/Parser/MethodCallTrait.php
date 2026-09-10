@@ -549,6 +549,25 @@ trait MethodCallTrait
 
     protected function parseMethodCall(Expr\MethodCall $expr): string
     {
+        $code = $this->parseMethodCallDispatch($expr);
+        if ($expr->getAttribute('nativeCall') !== null
+            || !$this->isNamedMethod($expr->name)
+            || $expr->isFirstClassCallable()
+        ) {
+            return $code;
+        }
+        // A runtime-dispatched call whose declared return type is scalar
+        // (typical in open-world mode) yields a Variant: convert it so that
+        // typed consumers (switch subjects, returns, temporaries) compile.
+        $type = $this->detectTypeOfExpr($expr);
+        if (in_array($type, [Type::INT, Type::FLOAT, Type::STR, Type::BOOL], true)) {
+            return $this->convertExprFromType($type, $code);
+        }
+        return $code;
+    }
+
+    protected function parseMethodCallDispatch(Expr\MethodCall $expr): string
+    {
         $this->validateImmutableCall($expr);
         if ($this->containsNullsafeChain($expr->var)) {
             return $this->parseNullsafeExpr($expr);
