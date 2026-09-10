@@ -1632,6 +1632,9 @@ trait AssignOpTrait
             $propertyReferenceTarget = [$object, $member, $scope];
             $left = '';
         } else {
+            if ($expr->var instanceof Expr\ArrayDimFetch) {
+                $expr->var->setAttribute(self::ATTR_ARRAY_DIM_FETCH_REF_TARGET, true);
+            }
             $left = $this->parseWritableIdentifier($expr->var);
         }
         // Keep this write-context form for every RHS kind. Re-parsing it as a

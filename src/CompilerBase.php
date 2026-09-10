@@ -160,6 +160,8 @@ class CompilerBase implements PropertyAccessContext
     protected const int COMPOSITE_TYPE_UNKNOWN = 0;
     protected const int COMPOSITE_TYPE_MATCH = 1;
     protected const string ATTR_ARRAY_DIM_FETCH_UPDATE = 'aotArrayDimFetchUpdate';
+    /** the dim fetch is the target of `= &`: the element slot itself is needed, not a copy of a reference it holds */
+    protected const string ATTR_ARRAY_DIM_FETCH_REF_TARGET = 'aotArrayDimFetchRefTarget';
     protected const string ATTR_PROPERTY_FETCH_UPDATE = 'aotPropertyFetchUpdate';
     /** the fetch is the subject of isset()/empty()/?? : read silently (uninitialized typed properties are not an error) */
     protected const string ATTR_PROPERTY_FETCH_PRESENCE = 'aotPropertyFetchPresence';

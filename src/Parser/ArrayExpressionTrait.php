@@ -266,6 +266,12 @@ trait ArrayExpressionTrait
             if (!$write && $node->getAttribute('listItem', false)) {
                 return 'typephp_list_item(' . $var . ', ' . $dim . ')';
             }
+            if ($write && $node->getAttribute(self::ATTR_ARRAY_DIM_FETCH_REF_TARGET, false) === true) {
+                // `$array[$key] = &$source` rebinds the element: an element that
+                // already holds a reference must be addressed as a slot, since
+                // item(key, true) returns a copy of the reference.
+                return $var . '.itemSlot(' . $dim . ')';
+            }
             return $var . '.item(' . $dim . ', ' . $this->escapeBool($write) . ')';
         }
     }
