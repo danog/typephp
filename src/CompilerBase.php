@@ -5362,7 +5362,16 @@ class CompilerBase implements PropertyAccessContext
         if ($toType === $fromType) {
             return true;
         }
-        // Native types can be converted between each other, handled by the C++ layer.
+        // int promotes to float; any other change of scalar type (`$x = false;
+        // ... $x = 0;`) would silently convert the value and break `===`
+        // comparisons: the local needs dynamic storage instead.
+        if ($toType === Type::FLOAT && $fromType === Type::INT) {
+            return true;
+        }
+        if ($this->isNativeType($toType) and $this->isNativeType($fromType) and $this->isVarExpr($left)) {
+            $name = $this->parseIdentifier($left);
+            $this->localTypeConflict($left, $name, "Cannot re-assign `\${$name}` from `{$fromType}` to `{$toType}`");
+        }
         if ($this->isNativeType($toType) and $this->isNativeType($fromType)) {
             return true;
         }
