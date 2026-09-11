@@ -241,7 +241,11 @@ trait PropertyAccessTrait
 
     protected function emitDynamicPropertyFetchWrite(Expr\PropertyFetch $expr, string $value, ?PropertyWriteTarget $target = null): string
     {
-        $cache = $this->isIdExpr($expr->name) && !$this->isNativePropertyAccess($expr)
+        // Every write emitted here goes through write_property (readonly
+        // rules, object-typed properties receiving dynamic values, unknown
+        // slots); the cache slot spares the handler the property lookup by
+        // name on every write (constructor property promotion in particular).
+        $cache = $this->isIdExpr($expr->name)
             ? $this->getPropertyAccessCache()
             : null;
         $object = $this->canEmitDynamicPropertyTarget($target)

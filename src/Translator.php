@@ -5454,8 +5454,13 @@ CODE;
         }
 
         $stmts = '';
+        $promotionCode = '';
         $this->indentLevel++;
         try {
+            // Constructor property promotion happens after parameter type
+            // validation (emitted in the preamble below), but is compiled here,
+            // before the local declarations of the scope are generated.
+            $promotionCode = $this->genPropertyPromotionStmts($this->functionDef);
             if ($v->stmts) {
                 $stmts = $this->parseStmts($v->stmts);
             }
@@ -5507,12 +5512,7 @@ CODE;
             }
         }
         // Constructor Property Promotion happens after parameter type validation.
-        foreach ($this->functionDef->argInfoList as $argInfo) {
-            if (!$argInfo->property) {
-                continue;
-            }
-            $preamble .= $this->genPropertyPromotion($argInfo);
-        }
+        $preamble .= $promotionCode;
         if ($preamble !== '') {
             $code .= $preamble . PHP_EOL;
         }

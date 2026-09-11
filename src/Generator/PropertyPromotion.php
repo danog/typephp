@@ -8,10 +8,46 @@
 
 namespace TypePhp\Generator;
 
+use PhpParser\Node;
+use PhpParser\Node\Expr;
 use TypePhp\Entity\ArgInfo;
+use TypePhp\Entity\FunctionDef;
 
 trait PropertyPromotion
 {
+    /**
+     * Constructor property promotion of a compiled (non-native, non-trait)
+     * class is compiled as the assignments `$this->prop = $prop;` PHP itself
+     * desugars it to: the property is declared on this class, so the write is
+     * a slot write with the property's static type check, not a runtime
+     * property lookup by name (which allocated the name and hashed it on
+     * every construction). Must run before the local declarations are
+     * generated, since the assignments may need temporaries.
+     */
+    protected function genPropertyPromotionStmts(FunctionDef $functionDef): string
+    {
+        $stmts = [];
+        $code = '';
+        foreach ($functionDef->argInfoList as $argInfo) {
+            if (!$argInfo->property) {
+                continue;
+            }
+            if ($this->classDef === null || $this->classDef->nativeObject || $this->classDef->trait) {
+                $code .= $this->genPropertyPromotion($argInfo);
+                continue;
+            }
+            $propertyName = $argInfo->phpName ?: $this->unescapeVarName($argInfo->name);
+            $stmts[] = new Node\Stmt\Expression(new Expr\Assign(
+                new Expr\PropertyFetch(new Expr\Variable('this'), new Node\Identifier($propertyName)),
+                new Expr\Variable($propertyName),
+            ));
+        }
+        if ($stmts !== []) {
+            $code .= $this->parseStmts($stmts);
+        }
+        return $code;
+    }
+
     protected function genPropertyPromotion(ArgInfo $argInfo): string
     {
         $code = '';
