@@ -960,8 +960,11 @@ class Translator extends Preprocessor
         }
 
         if ($this->literalStrings) {
-            $lines[] = 'ZEND_ATTRIBUTE_CONST ' . Type::STR . ' &'
-                . self::LITERAL_STRING_GETTER . '(uint32_t index);' . PHP_EOL;
+            // the literal table is addressed inline: a call per string constant
+            // was measurable in call-heavy code
+            $lines[] = 'extern ' . Type::STR . ' ' . self::LITERAL_STRINGS . '[];';
+            $lines[] = 'static inline ' . Type::STR . ' &'
+                . self::LITERAL_STRING_GETTER . '(uint32_t index) { return ' . self::LITERAL_STRINGS . '[index]; }' . PHP_EOL;
         }
 
         foreach ($this->constants as $name => $constant) {
@@ -985,10 +988,43 @@ class Translator extends Preprocessor
         $lines[] = 'zend_class_entry *get_class(RequestClassId class_id, const php::Str &class_name);';
         $lines[] = 'zend_function *get_func(RequestFuncId func_id, const php::Str &func_name);';
         $lines[] = 'zend_function *get_method(RequestFuncId func_id, const php::Str &method_name, RequestClassId class_id, const php::Str &class_name);';
-        $lines[] = 'zend_class_entry *get_persistent_class(PersistentClassId class_id, const php::Str &class_name);';
-        $lines[] = 'zend_function *get_persistent_func(PersistentFuncId func_id, const php::Str &func_name);';
-        $lines[] = 'zend_function *get_persistent_method(PersistentFuncId func_id, const php::Str &method_name, PersistentClassId class_id, const php::Str &class_name);';
-        $lines[] = 'uint32_t get_persistent_prop(PersistentPropertyId prop_id, const php::Str &prop_name, const php::Str &class_name);' . PHP_EOL;
+        // Persistent (module-lifetime) lookups are inline: the cached path is a
+        // load and a branch, the resolver runs once per symbol.
+        $lines[] = 'extern php::PersistentCacheSlot<zend_class_entry *> ' . self::PREFIX . self::PERSISTENT_CLASS_MAP . '[];';
+        $lines[] = 'extern php::PersistentCacheSlot<zend_function *> ' . self::PREFIX . self::PERSISTENT_FUNC_MAP . '[];';
+        $lines[] = 'extern php::PersistentCacheSlot<uint32_t> ' . self::PREFIX . self::PERSISTENT_PROP_MAP . '[];';
+        $lines[] = <<<'CODE'
+static inline zend_class_entry *get_persistent_class(PersistentClassId class_id, const php::Str &class_name) {
+    const auto index = static_cast<uint32_t>(class_id);
+    return php::getPersistentCache(php_persistent_class_map[index], [&]() {
+        return php::getClassEntrySafe(class_name);
+    });
+}
+
+static inline zend_function *get_persistent_func(PersistentFuncId func_id, const php::Str &func_name) {
+    const auto index = static_cast<uint32_t>(func_id);
+    return php::getPersistentCache(php_persistent_func_map[index], [&]() {
+        return php::getFunction(func_name);
+    });
+}
+
+static inline zend_function *get_persistent_method(PersistentFuncId func_id, const php::Str &method_name, PersistentClassId class_id, const php::Str &class_name) {
+    const auto index = static_cast<uint32_t>(func_id);
+    return php::getPersistentCache(php_persistent_func_map[index], [&]() {
+        auto ce = get_persistent_class(class_id, class_name);
+        return php::getMethod(ce, method_name);
+    });
+}
+
+static inline uint32_t get_persistent_prop(PersistentPropertyId prop_id, const php::Str &prop_name, const php::Str &class_name) {
+    const auto index = static_cast<uint32_t>(prop_id);
+    auto value = php::getPersistentCache(php_persistent_property_map[index], [&]() {
+        return php::getPropertyOffset(class_name, prop_name) + 1024;
+    });
+    return value - 1024;
+}
+
+CODE;
         $lines[] = 'php::PropertyCacheSlot &get_property_cache(PropertyCacheId cache_id);' . PHP_EOL;
         $lines[] = 'php::MethodCallCacheSlot &typephp_get_method_call_cache(MethodCallCacheId cache_id);' . PHP_EOL;
         $lines[] = 'php::FunctionCallCacheSlot &typephp_get_function_call_cache(FunctionCallCacheId cache_id);' . PHP_EOL;
@@ -1189,17 +1225,17 @@ class Translator extends Preprocessor
         // Internal/compiled symbols have module lifetime. They are initialized
         // lazily after PHP startup, so disable_functions/disable_classes have
         // already finalized the runtime tables. ZTS publishes them atomically.
-        $code .= 'static php::PersistentCacheSlot<zend_class_entry *> ' . self::PREFIX . self::PERSISTENT_CLASS_MAP . '[' . max(1, count($this->persistentClassMap)) . ']{};' . PHP_EOL;
+        $code .= 'php::PersistentCacheSlot<zend_class_entry *> ' . self::PREFIX . self::PERSISTENT_CLASS_MAP . '[' . max(1, count($this->persistentClassMap)) . ']{};' . PHP_EOL;
 
         $code .= "// func \n";
-        $code .= 'static php::PersistentCacheSlot<zend_function *> ' . self::PREFIX . self::PERSISTENT_FUNC_MAP . '[' . max(1, count($this->persistentFuncMap)) . ']{};' . PHP_EOL;
+        $code .= 'php::PersistentCacheSlot<zend_function *> ' . self::PREFIX . self::PERSISTENT_FUNC_MAP . '[' . max(1, count($this->persistentFuncMap)) . ']{};' . PHP_EOL;
 
         $code .= $this->genPythonModuleStorage();
 
         $code .= "// property \n";
         // No dynamic propMap: the property offset cache only covers declared
         // properties of compiled/built-in classes (see getPropertyId).
-        $code .= 'static php::PersistentCacheSlot<uint32_t> ' . self::PREFIX . self::PERSISTENT_PROP_MAP . '[' . max(1, count($this->persistentPropMap)) . ']{};' . PHP_EOL;
+        $code .= 'php::PersistentCacheSlot<uint32_t> ' . self::PREFIX . self::PERSISTENT_PROP_MAP . '[' . max(1, count($this->persistentPropMap)) . ']{};' . PHP_EOL;
         $code .= "// functions \n";
 
         $code .= <<<'CODE'
@@ -1231,36 +1267,6 @@ zend_function *get_method(RequestFuncId func_id, const php::Str &method_name, Re
     return slot;
 }
 
-zend_class_entry *get_persistent_class(PersistentClassId class_id, const php::Str &class_name) {
-    const auto index = static_cast<uint32_t>(class_id);
-    return php::getPersistentCache(php_persistent_class_map[index], [&]() {
-        return php::getClassEntrySafe(class_name);
-    });
-}
-
-zend_function *get_persistent_func(PersistentFuncId func_id, const php::Str &func_name) {
-    const auto index = static_cast<uint32_t>(func_id);
-    return php::getPersistentCache(php_persistent_func_map[index], [&]() {
-        return php::getFunction(func_name);
-    });
-}
-
-zend_function *get_persistent_method(PersistentFuncId func_id, const php::Str &method_name, PersistentClassId class_id, const php::Str &class_name) {
-    const auto index = static_cast<uint32_t>(func_id);
-    return php::getPersistentCache(php_persistent_func_map[index], [&]() {
-        auto ce = get_persistent_class(class_id, class_name);
-        return php::getMethod(ce, method_name);
-    });
-}
-
-uint32_t get_persistent_prop(PersistentPropertyId prop_id, const php::Str &prop_name, const php::Str &class_name) {
-    const auto index = static_cast<uint32_t>(prop_id);
-    auto value = php::getPersistentCache(php_persistent_property_map[index], [&]() {
-        return php::getPropertyOffset(class_name, prop_name) + 1024;
-    });
-    return value - 1024;
-}
-
 php::PropertyCacheSlot &get_property_cache(PropertyCacheId cache_id) {
     return php_request_cache->property_cache_map[static_cast<uint32_t>(cache_id)];
 }
@@ -1279,7 +1285,7 @@ CODE;
 
         $code .= "// literal strings \n";
         if ($this->literalStrings) {
-            $code .= 'static ' . Type::STR . ' ' . self::LITERAL_STRINGS . '[] = {' . PHP_EOL;
+            $code .= Type::STR . ' ' . self::LITERAL_STRINGS . '[] = {' . PHP_EOL;
             foreach ($this->literalStrings as $str => $index) {
                 // PHP converts canonical integer-string array keys (for
                 // example "0" and "-1") to int. literalStrings only accepts
@@ -1287,10 +1293,6 @@ CODE;
                 $code .= Type::STR . '{ZEND_STRL("' . $this->escapeString((string) $str) . '"), true}, // [' . $index . ']' . PHP_EOL;
             }
             $code .= '};' . PHP_EOL . PHP_EOL;
-            $code .= 'ZEND_ATTRIBUTE_CONST ' . Type::STR . ' &'
-                . self::LITERAL_STRING_GETTER . '(uint32_t index) {' . PHP_EOL;
-            $code .= $this->getIndent() . 'return ' . self::LITERAL_STRINGS . '[index];' . PHP_EOL;
-            $code .= '}' . PHP_EOL . PHP_EOL;
         } else {
             $code .= PHP_EOL;
         }
