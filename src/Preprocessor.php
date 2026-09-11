@@ -2187,6 +2187,10 @@ class Preprocessor extends CompilerBase
             );
         }
         $this->validateClassScopeTypeKeywords($typeNode, true, $this->currentClassScopeHasParent());
+        // `self`/`parent`/`static` in the property type resolve to the declaring
+        // class in the property's runtime type check (promoted `?self` parameters
+        // are assigned through the property type check).
+        $this->markLateBoundTypeNodes($typeNode);
         $flags = $this->parseModifiers($flags);
         // A `readonly class` marks every property readonly, so the class-level
         // flag participates in the same Zend declaration rules as an explicit
