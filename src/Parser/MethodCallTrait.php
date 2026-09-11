@@ -156,6 +156,32 @@ trait MethodCallTrait
         return !empty($this->classSubClasses[$classNameLower]);
     }
 
+    /**
+     * Whether any (transitive) subclass declares or composes (trait) a method
+     * of this name; classMethodOverride has an entry for every such method
+     * once finalizeMethodOverrideFlags() ran.
+     */
+    protected function isMethodDeclaredInSubClasses(string $classNameLower, string $method): bool
+    {
+        $methodLower = strtolower($method);
+        $stack = $this->classSubClasses[$classNameLower] ?? [];
+        $seen = [];
+        while ($stack !== []) {
+            $subClass = array_pop($stack);
+            if (isset($seen[$subClass])) {
+                continue;
+            }
+            $seen[$subClass] = true;
+            if (isset($this->classMethodOverride[$subClass . '::' . $methodLower])) {
+                return true;
+            }
+            foreach ($this->classSubClasses[$subClass] ?? [] as $grandChild) {
+                $stack[] = $grandChild;
+            }
+        }
+        return false;
+    }
+
     protected function isCurrentClassFinal(): bool
     {
         return $this->classDef && ($this->classDef->flags & Modifiers::FINAL) !== 0;
@@ -283,7 +309,15 @@ trait MethodCallTrait
             }
             if ($object !== 'this_' && !isset($this->context->stableObjects[$object])
                 && ($this->isAbstractClass($class) || $this->isInterface($class))) {
-                return false;
+                // Closed world: a concrete method that no subclass of the
+                // receiver's (abstract) class redeclares has exactly one
+                // implementation, so the call is direct (PhpParser's
+                // `$node->getAttribute()` through `Node\Expr`/`Node\Stmt`).
+                if ($this->openWorld || $this->isInterface($class) || !$this->hasClass($class)
+                    || $this->isMethodDeclaredInSubClasses(strtolower(ltrim($class, '\\')), $method)
+                ) {
+                    return false;
+                }
             }
             $this->checkFunction($nativeFunc);
             if ($this->hasFunction($nativeFunc)) {
