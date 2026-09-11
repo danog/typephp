@@ -178,9 +178,19 @@ trait CompositeTypeCheckerTrait
             return self::COMPOSITE_TYPE_UNKNOWN;
         }
 
-        return $this->isObjectClassStaticallyAssignableTo($class, $expected)
-            ? self::COMPOSITE_TYPE_MATCH
-            : self::COMPOSITE_TYPE_MISMATCH;
+        if ($this->isObjectClassStaticallyAssignableTo($class, $expected)) {
+            return self::COMPOSITE_TYPE_MATCH;
+        }
+        // The declared class is a supertype of the expected one: the runtime
+        // object may be the subclass (`if ($x instanceof Sub) f($x)`), PHP
+        // checks at the call. Same for interfaces unless the class is final.
+        if ($this->isObjectClassStaticallyAssignableTo($expected, $class)) {
+            return self::COMPOSITE_TYPE_UNKNOWN;
+        }
+        if (($this->isInterface($class) || $this->isInterface($expected)) && !$this->isFinalClass($class)) {
+            return self::COMPOSITE_TYPE_UNKNOWN;
+        }
+        return self::COMPOSITE_TYPE_MISMATCH;
     }
 
     protected function isNullExpr(NodeAbstract $expr): bool
